@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Challenge Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .header-font { font-family: 'Fredoka One', cursive; }
+        .modal { display: none; }
+        .modal.flex { display: flex; }
+        
+        .heatmap-cell {
+            width: 16px;
+            height: 16px;
+            margin: 1.5px;
+            border-radius: 3px;
+            transition: all 0.2s ease;
+        }
+        .heatmap-cell:hover {
+            transform: scale(1.4);
+            z-index: 10;
+            position: relative;
+            box-shadow: 0 0 8px rgba(0,0,0,0.2);
+        }
+        .heatmap-level-0 { background: #e5e7eb; }
+        .heatmap-level-1 { background: #bfdbfe; }
+        .heatmap-level-2 { background: #60a5fa; }
+        .heatmap-level-3 { background: #2563eb; }
+        .heatmap-level-4 { background: #1e3a8a; }
+        
+        .progress-fill {
+            transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+        }
+
+        /* Unified Container Heights */
+        .row-1-height { height: 750px; }
+        .row-2-height { height: 720px; } 
+
+        .section-header {
+            font-weight: 800;
+            letter-spacing: -0.025em;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+
+    <div id="app-container" class="max-w-7xl mx-auto p-4 md:p-8 text-slate-800">
+        
+        <header class="flex flex-col md:flex-row justify-between items-center mb-12 gap-6 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+            <div class="text-center md:text-left">
+                <h1 class="header-font text-5xl text-blue-700 drop-shadow-sm">Spring Challenge</h1>
+                <div class="flex items-center gap-3 mt-3 justify-center md:justify-start">
+                    <p id="countdown-timer" class="text-blue-600 font-black text-xl tracking-tight uppercase"></p>
+                </div>
+            </div>
+            <div class="flex flex-wrap justify-center gap-4">
+                <button id="rules-btn" class="bg-white border border-slate-200 text-slate-700 font-bold py-4 px-10 rounded-[1.5rem] shadow-sm hover:bg-slate-50 transition flex items-center gap-2 text-xl">
+                    <span>📜</span> Rules
+                </button>
+                <button id="heatmap-btn" class="bg-emerald-500 text-white font-bold py-4 px-10 rounded-[1.5rem] shadow-md hover:bg-emerald-600 transition flex items-center gap-2 text-xl">
+                    <span>🔥</span> Activity Map
+                </button>
+            </div>
+        </header>
+
+        <div id="loading-state" class="flex flex-col items-center justify-center py-32">
+            <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mb-4"></div>
+            <p class="text-slate-500 font-medium italic text-xl">Fetching spring data...</p>
+        </div>
+
+        <div id="main-content" class="hidden space-y-12">
+            
+            <!-- Player Grid -->
+            <section id="overall-view" class="space-y-12">
+                <div id="player-cards-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"></div>
+
+                <!-- Row 1: Unified Height Triple Cards -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                    <!-- Left: Hustle Feed -->
+                    <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col row-1-height">
+                        <h3 class="section-header text-2xl text-slate-800 mb-6 flex items-center gap-3 tracking-tighter">
+                            <span class="bg-yellow-100 p-2 rounded-xl text-sm">⚡</span> Hustle Feed
+                        </h3>
+                        <div id="hustle-feed" class="flex-1 overflow-y-auto space-y-6 pr-2 hide-scrollbar"></div>
+                    </div>
+
+                    <!-- Middle: Weekly Progress -->
+                    <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col row-1-height">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="section-header text-2xl text-slate-800 flex items-center gap-3 tracking-tighter">
+                                <span class="bg-blue-100 p-2 rounded-xl text-sm">📅</span> Weekly Effort
+                            </h3>
+                            <span class="bg-blue-50 text-blue-700 text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest">600 PT CAP</span>
+                        </div>
+                        <div id="weekly-progress-bars" class="space-y-10 flex-1 overflow-y-auto hide-scrollbar pt-2"></div>
+                    </div>
+
+                    <!-- Right: Active Distribution -->
+                    <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col row-1-height">
+                        <h3 class="section-header text-2xl text-slate-800 flex items-center gap-3 tracking-tighter mb-2">
+                            <span class="bg-emerald-100 p-2 rounded-xl text-sm">🍩</span> Activity Split
+                        </h3>
+                        <p class="text-[10px] text-slate-400 mb-4 uppercase font-black tracking-widest text-center">Outer: Pts • Inner: Mins</p>
+                        <div id="activity-pie-grid" class="grid grid-cols-2 gap-4 flex-1 overflow-y-auto hide-scrollbar"></div>
+                    </div>
+                </div>
+
+                <!-- Row 2: Milestone Progress (2 cols) & Consistency Leaderboard (1 col) -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                    <!-- Milestone Progress -->
+                    <div class="lg:col-span-8 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 row-2-height flex flex-col">
+                        <h3 class="section-header text-2xl text-slate-800 mb-2 flex items-center gap-3 tracking-tighter">
+                            <span class="bg-orange-100 p-2 rounded-xl text-sm">🏆</span> Tier Milestones
+                        </h3>
+                        <div id="prize-tracker" class="flex-1 overflow-y-auto hide-scrollbar"></div>
+                    </div>
+                    
+                    <!-- Consistency Rankings -->
+                    <div class="lg:col-span-4 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 row-2-height flex flex-col">
+                        <h3 class="section-header text-2xl text-slate-800 mb-6 flex items-center gap-3 tracking-tighter">
+                            <span class="bg-indigo-100 p-2 rounded-xl text-sm">🎯</span> Consistency
+                        </h3>
+                        <div id="consistency-list" class="space-y-4 flex-1 overflow-y-auto hide-scrollbar"></div>
+                    </div>
+                </div>
+
+                <!-- Row 3: Full Width Growth -->
+                <div class="bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100">
+                    <div class="flex justify-between items-center mb-8">
+                        <h3 class="section-header text-3xl text-slate-800 flex items-center gap-4 tracking-tighter">
+                            <span class="bg-indigo-50 p-3 rounded-2xl text-base">📈</span> Season Progression
+                        </h3>
+                        <div class="text-sm text-slate-400 font-bold uppercase italic tracking-wider">Click a name to toggle visibility</div>
+                    </div>
+                    <div class="h-[450px] w-full">
+                        <canvas id="progress-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Bottom Row: Logbook Explorer -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                    <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+                        <div class="flex justify-between items-center mb-8">
+                            <h3 class="section-header text-2xl text-slate-800 tracking-tighter">Logbook Explorer</h3>
+                            <div class="flex items-center space-x-3 bg-slate-100 p-2 rounded-2xl">
+                                <button id="prev-day-btn" class="hover:bg-white p-3 rounded-xl transition font-bold text-xl">←</button>
+                                <span id="logbook-date" class="text-base font-bold text-slate-600 min-w-[200px] text-center"></span>
+                                <button id="next-day-btn" class="hover:bg-white p-3 rounded-xl transition font-bold text-xl">→</button>
+                            </div>
+                        </div>
+                        <div id="logbook-entries" class="space-y-5 h-[450px] overflow-y-auto pr-2 hide-scrollbar"></div>
+                    </div>
+
+                    <div id="weekly-spotlight-container" class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 h-full flex flex-col"></div>
+                </div>
+            </section>
+            
+            <div id="detail-view" class="hidden min-h-screen bg-slate-50 pt-4 pb-20"></div>
+        </div>
+
+        <footer class="text-center py-16">
+            <p class="text-slate-400 text-sm font-medium tracking-widest uppercase">Spring Challenge 2026 Dashboard</p>
+        </footer>
+    </div>
+
+    <div id="rules-modal" class="modal fixed inset-0 bg-slate-900/60 backdrop-blur-sm items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-[2.5rem] shadow-2xl p-10 max-w-xl w-full relative text-sm md:text-base">
+            <h2 class="text-4xl font-bold mb-8 text-blue-800 header-font text-center uppercase tracking-tighter">Point Rules</h2>
+            <ul class="space-y-4 text-slate-600">
+                <li class="flex gap-3">
+                    <span class="text-blue-500 font-bold text-xl">1.</span>
+                    <p><strong>Practice/Lessons:</strong> 10 mins = 5 pts.</p>
+                </li>
+                <li class="flex gap-3">
+                    <span class="text-blue-500 font-bold text-xl">2.</span>
+                    <p><strong>Independent:</strong> Multipliers apply! (2x or 3x depending on player)</p>
+                </li>
+                <li class="flex gap-3">
+                    <span class="text-blue-500 font-bold text-xl">3.</span>
+                    <p><strong>Daily Cap:</strong> 150 pts max per day.</p>
+                </li>
+                <li class="flex gap-3">
+                    <span class="text-blue-500 font-bold text-xl">4.</span>
+                    <p><strong>Weekly Cap:</strong> 600 pts max per week.</p>
+                </li>
+            </ul>
+            <button class="close-modal-btn absolute top-8 right-8 text-slate-400 hover:text-slate-600 text-3xl">✕</button>
+        </div>
+    </div>
+
+    <div id="generic-modal" class="modal fixed inset-0 bg-slate-900/60 backdrop-blur-sm items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-[2.5rem] shadow-2xl p-10 max-w-5xl w-full relative max-h-[90vh] overflow-y-auto">
+            <div id="generic-modal-body"></div>
+            <button class="close-modal-btn absolute top-8 right-8 text-slate-400 hover:text-slate-600 text-3xl">✕</button>
+        </div>
+    </div>
+
+    <script>
+        const GOOGLE_SHEET_URL = 'REPLACE_WITH_SPRING_SHEET_CSV_URL';
+
+        const PLAYER_CONFIG = {
+            aaron: { name: "Aaron", color: "amber", emoji: "🏈", hex: "#f59e0b", multipliers: { independent: 2, walk: 1, bike: 1 } },
+            cameron: { name: "Cameron", color: "red", emoji: "🥋", hex: "#ef4444", multipliers: { independent: 3, bike: 1 } },
+            colin: { name: "Colin", color: "emerald", emoji: "👟", hex: "#10b981", multipliers: { independent: 2, walk: 1, bike: 1 } },
+            ellie: { name: "Ellie", color: "rose", emoji: "⚽️", hex: "#f43f5e", multipliers: { independent: 3, bike: 1 } },
+            isla: { name: "Isla", color: "pink", emoji: "⚽", hex: "#ec4899", multipliers: { independent: 3, bike: 1 } },
+            taylor: { name: "Taylor", color: "teal", emoji: "🏒", hex: "#14b8a6", multipliers: { independent: 3, bike: 1 } },
+        };
+
+        const TAILWIND_COLOR_MAP = {
+            amber: { bg: 'bg-amber-500', text: 'text-amber-600', border: 'border-amber-200', light: 'bg-amber-50' },
+            red: { bg: 'bg-red-500', text: 'text-red-600', border: 'border-red-200', light: 'bg-red-50' },
+            emerald: { bg: 'bg-emerald-500', text: 'text-emerald-600', border: 'border-emerald-200', light: 'bg-emerald-50' },
+            rose: { bg: 'bg-rose-500', text: 'text-rose-600', border: 'border-rose-200', light: 'bg-rose-50' },
+            pink: { bg: 'bg-pink-500', text: 'text-pink-600', border: 'border-pink-200', light: 'bg-pink-50' },
+            teal: { bg: 'bg-teal-500', text: 'text-teal-600', border: 'border-teal-200', light: 'bg-teal-50' },
+        };
+
+        const ACTIVITY_ICONS = {
+            basketball: '🏀',
+            cheer: '📣',
+            gym: '💪',
+            hockey: '🏒',
+            karate: '🥋',
+            music: '🎵',
+            run: '🏃',
+            soccer: '⚽',
+            walk: '🚶',
+            physio: '🏥',
+            volleyball: '🏐',
+            skating: '⛸️',
+            tumbling: '🤸',
+            skiing: '⛷️',
+            school: '📚',
+            swimming: '🏊',
+            bike: '🚴',
+            default: '⭐'
+        };
+
+        const getActivityIcon = (activityName) => {
+            const actLower = activityName.toLowerCase();
+            if (actLower.includes('basket') || actLower.includes('ball')) return ACTIVITY_ICONS.basketball;
+            else if (actLower.includes('cheer')) return ACTIVITY_ICONS.cheer;
+            else if (actLower.includes('gym')) return ACTIVITY_ICONS.gym;
+            else if (actLower.includes('hockey')) return ACTIVITY_ICONS.hockey;
+            else if (actLower.includes('karate')) return ACTIVITY_ICONS.karate;
+            else if (actLower.includes('music')) return ACTIVITY_ICONS.music;
+            else if (actLower.includes('run')) return ACTIVITY_ICONS.run;
+            else if (actLower.includes('soccer')) return ACTIVITY_ICONS.soccer;
+            else if (actLower.includes('walk')) return ACTIVITY_ICONS.walk;
+            else if (actLower.includes('physio')) return ACTIVITY_ICONS.physio;
+            else if (actLower.includes('volleyball')) return ACTIVITY_ICONS.volleyball;
+            else if (actLower.includes('skating') || actLower.includes('skate')) return ACTIVITY_ICONS.skating;
+            else if (actLower.includes('tumble') || actLower.includes('tumbling')) return ACTIVITY_ICONS.tumbling;
+            else if (actLower.includes('ski')) return ACTIVITY_ICONS.skiing;
+            else if (actLower.includes('school') || actLower.includes('homework') || actLower.includes('study')) return ACTIVITY_ICONS.school;
+            else if (actLower.includes('swim')) return ACTIVITY_ICONS.swimming;
+            else if (actLower.includes('bike') || actLower.includes('cycling') || actLower.includes('ride')) return ACTIVITY_ICONS.bike;
+            else return ACTIVITY_ICONS.default;
+        };
+
+        const HUSTLE_MESSAGES = {
+            basketball: [
+                "[PLAYER] is basically MJ after that basketball session!", "Nothing but net for [PLAYER] on the basketball court!", "The court is still smoking from [PLAYER]'s handles.", "Hoop dreams coming true for [PLAYER] at basketball!", "Splash! [PLAYER] just drained another basketball three.", "Lockdown defense and scoring from [PLAYER] on the court.", "[PLAYER] is taking it to the rack in basketball!", "[PLAYER] just broke some ankles on the court!", "Point guard precision from [PLAYER] during basketball!", "Basketball beast mode: [PLAYER] is on fire.", "Clutch performance from [PLAYER] on the court today.", "A total basketball clinic put on by [PLAYER]!", "[PLAYER] just showed everyone how it's done in basketball.", "Swish! That's another great basketball session for [PLAYER].", "[PLAYER] is ruling the paint in basketball today.", "Full-court hustle from [PLAYER] during basketball practice.", "Basketball magic! [PLAYER] is dominating the hoop.", "[PLAYER] just hit the buzzer-beater in basketball!", "Double-double effort from [PLAYER] on the court.", "Basketball legend in the making: go [PLAYER]!", "Elite level basketball focus from [PLAYER] today.", "[PLAYER] is moving like a pro at basketball.", "Hard work meets heavy buckets for [PLAYER]!", "Total basketball command from [PLAYER] right now.", "[PLAYER] is practically floating on the basketball court.", "Unstoppable force at basketball: that's [PLAYER]!", "High-IQ basketball plays coming from [PLAYER].", "That basketball hoop is afraid of [PLAYER]!", "A legendary basketball grind from [PLAYER] today.", "Defense wins games, and [PLAYER] won basketball today!", "Basketball intensity reached 100 for [PLAYER].", "Just call [PLAYER] the basketball closer.", "Court general [PLAYER] just finished an epic session.", "A smooth finish at the rim for [PLAYER]!", "Fast break master [PLAYER] is ruling basketball.", "No one can guard [PLAYER] in basketball right now.", "Basketball excellence achieved by [PLAYER].", "The basketball rim just felt the power of [PLAYER].", "All-Star basketball energy from [PLAYER] today.", "Game, set, match? No, just total basketball dominance from [PLAYER]!"
+            ],
+            cheer: [
+                "[PLAYER] just took spirit to a whole new level!", "High-flying stunts from [PLAYER] in cheer today!", "Precision and power: [PLAYER] is a cheer legend.", "Pyramid perfection! Great cheer session, [PLAYER]!", "Sparkle and spirit – [PLAYER] is crushing cheer.", "Loud and proud cheer hustle from [PLAYER]!", "Gravity is just a suggestion for [PLAYER] in cheer.", "Stunting like a pro! Awesome cheer work, [PLAYER].", "The most spirit on the mat: that's [PLAYER]!", "Elite cheer energy from [PLAYER] today!", "Tumbling and cheering – [PLAYER] has it all.", "Cheer mode: ACTIVATED for [PLAYER].", "Unmatched cheer focus from [PLAYER] right now.", "A total spirit explosion from [PLAYER] in cheer!", "Flying high and landing perfectly: go [PLAYER]!", "Cheer skills on point for [PLAYER] today.", "Nobody cheers with more heart than [PLAYER].", "That cheer routine was absolute magic, [PLAYER]!", "Cheer beast mode: [PLAYER] is unstoppable.", "Mastering the mat in cheer today: [PLAYER]!", "[PLAYER] just defined what it means to be a cheerleader.", "Sharp motions and big smiles for [PLAYER] in cheer.", "Cheer excellence achieved by [PLAYER] today.", "[PLAYER] is the heart and soul of the cheer squad.", "Taking the cheer world by storm: it's [PLAYER]!", "Perfect form and peak spirit for [PLAYER] in cheer.", "Cheer practice was no match for [PLAYER]'s energy.", "A gold-medal cheer effort from [PLAYER]!", "[PLAYER] is flipping for joy after that cheer session.", "Spirit fingers and serious skills for [PLAYER]!", "Cheer powerhouse [PLAYER] is on the move.", "That cheer session was a total ten, [PLAYER]!", "Strength and grace combined in cheer for [PLAYER].", "Cheer hustle reached max capacity today, [PLAYER]!", "Building empires and pyramids: that's [PLAYER]!", "Total mat dominance from [PLAYER] in cheer.", "[PLAYER] just nailed the spirit lead today.", "Graceful and gritty – [PLAYER] won at cheer today.", "The loudest voice and the biggest stunts: [PLAYER]!", "Cheer star [PLAYER] just left it all on the mat."
+            ],
+            gym: [
+                "[PLAYER]'s muscles are growing in real-time!", "Check out those gains! [PLAYER] hit the gym hard.", "Gym beast mode: ACTIVATED for [PLAYER].", "[PLAYER] just schooled the gym equipment today.", "Weight room warrior [PLAYER] is on the move!", "No pain, all gain for [PLAYER] in the gym today!", "[PLAYER] is turning iron into gold at the gym.", "The dumbbells are afraid of [PLAYER] right now.", "Flex alert! [PLAYER] made the gym look easy.", "Muscles loading... [PLAYER] just finished a session.", "Superhero energy in the gym from [PLAYER]!", "[PLAYER] just redefined heavy lifting today.", "Gym motivation level 100 achieved by [PLAYER].", "The squat rack just met its master: [PLAYER].", "Sweat is just fat crying! Go [PLAYER]!", "Strength and honor from [PLAYER] at the gym.", "[PLAYER] just crushed a massive gym set!", "Elite level gym focus from [PLAYER] today.", "Gym warrior [PLAYER] is building a legacy.", "That workout was a total masterpiece, [PLAYER]!", "Burning calories and building power: go [PLAYER]!", "[PLAYER] is the king/queen of the gym today.", "Gym time is prime time for [PLAYER]!", "Building a better version of self: go [PLAYER]!", "[PLAYER] just went above and beyond at the gym.", "Total gym annihilation by [PLAYER] today.", "Heavy weights and high spirits for [PLAYER]!", "The gym floor is still shaking from [PLAYER]!", "Record-breaking gym energy from [PLAYER] today.", "[PLAYER] just made history in the weight room.", "Just call [PLAYER] the gym commander.", "A symphony of steel and sweat for [PLAYER]!", "Peak gym performance reached by [PLAYER].", "Every rep counts, and [PLAYER] counted them all.", "Gym discipline on full display from [PLAYER].", "The path to power starts at the gym for [PLAYER].", "Unstoppable gym momentum from [PLAYER]!", "Iron sharpens iron, and [PLAYER] is sharp!", "Gym legend [PLAYER] is putting in the work.", "One more rep? [PLAYER] did ten more!"
+            ],
+            hockey: [
+                "[PLAYER] has ice in their veins today!", "A bar-down beauty of a session for [PLAYER]!", "Hockey hustle: [PLAYER] is owning the rink.", "Slap shots and hat tricks for [PLAYER] today.", "The goalie never stood a chance against [PLAYER]!", "Lighting the lamp in hockey: go [PLAYER]!", "[PLAYER] just put on a hockey clinic.", "Skating circles around the rest: that's [PLAYER]!", "Hockey beast mode: [PLAYER] is on fire.", "Grit, heart, and hockey for [PLAYER] today.", "[PLAYER] just delivered a knockout hockey session.", "Snipe city! [PLAYER] is shooting lights out.", "Top bins only for hockey star [PLAYER]!", "The zamboni can't keep up with [PLAYER].", "Hockey dominance reached 100 for [PLAYER].", "Defensive wall [PLAYER] is a hockey force.", "Total puck control from [PLAYER] today.", "[PLAYER] is the MVP of the hockey rink.", "Cold ice, hot hustle: go [PLAYER]!", "Hockey legend in the making: it's [PLAYER].", "A physical and fast hockey session for [PLAYER]!", "[PLAYER] is practically flying on the ice.", "Hockey skills on full display from [PLAYER].", "Checking hard and scoring harder: go [PLAYER]!", "The blue line belongs to [PLAYER] today.", "Hockey magic from the stick of [PLAYER]!", "A total power play from [PLAYER] at the rink.", "No one can stop [PLAYER] on the ice right now.", "Hockey intensity maxed out by [PLAYER]!", "Skating hard and playing smart: go [PLAYER]!", "The scoreboard is singing [PLAYER]'s name.", "Hockey discipline meets raw talent for [PLAYER].", "A frozen-tundra victory for [PLAYER] today.", "[PLAYER] just defined hockey excellence.", "Fastest feet on the ice belong to [PLAYER].", "Just call [PLAYER] the hockey commander.", "A masterclass in puck movement by [PLAYER]!", "[PLAYER] is the ultimate hockey warrior.", "Ice cold precision from [PLAYER] today.", "Hockey heart and soul: that's [PLAYER]!"
+            ],
+            karate: [
+                "Watch out! [PLAYER] is a certified ninja.", "[PLAYER] just kicked through the atmosphere!", "Black belt energy from [PLAYER] in the dojo.", "Focus. Power. Discipline. [PLAYER] has it all.", "Kiai! [PLAYER] just crushed that karate session.", "Martial arts mastery in progress for [PLAYER].", "Hi-ya! [PLAYER] is moving with precision.", "[PLAYER] just mastered a new kata today!", "Strikes like a cobra, moves like [PLAYER].", "Dojo dominance achieved by [PLAYER] today.", "Exceptional form on those kicks, [PLAYER]!", "Karate beast mode: [PLAYER] is unstoppable.", "The silent warrior [PLAYER] put in the work.", "Spirit, mind, and body – [PLAYER] is a force.", "Chop-chopping through the day: go [PLAYER]!", "Mastering the way of the warrior: it's [PLAYER].", "[PLAYER] just delivered a knockout performance.", "Hard work and high kicks for [PLAYER] today.", "Karate powerhouse [PLAYER] is on a roll.", "The dojo is lucky to have [PLAYER] today!", "Speed and strength: the [PLAYER] karate way.", "[PLAYER] is channeling their inner karate kid.", "Respect the gi! [PLAYER] just leveled up.", "Perfect karate balance found by [PLAYER]!", "A total focus session for karate star [PLAYER].", "Ninja skills loading... [PLAYER] is ready.", "Karate intensity maxed out by [PLAYER]!", "[PLAYER] just broke through barriers in karate.", "Just call [PLAYER] the karate sensei today.", "Elite level strikes from [PLAYER] in the dojo.", "Unmatched karate discipline from [PLAYER].", "[PLAYER] is moving like a shadow in karate.", "A legacy of power being built by [PLAYER].", "Karate heart and hustle: that's [PLAYER]!", "The mat is the stage for [PLAYER]'s karate.", "[PLAYER] just proved they are a karate king/queen.", "Martial brilliance from [PLAYER] today.", "Karate excellence: achieved by [PLAYER].", "Every strike was a statement from [PLAYER]!", "Karate warrior [PLAYER] is rising to the top."
+            ],
+            music: [
+                "[PLAYER] just delivered a Grammy-worthy performance!", "Mozart who? [PLAYER] is the new virtuoso!", "[PLAYER] is making the world sound better today.", "Soulful sounds and serious skills from [PLAYER]!", "The rhythm of a champion: go [PLAYER]!", "Music mastery in progress for [PLAYER] today.", "[PLAYER] just hit the high notes of hustle.", "Practice makes perfect, and [PLAYER] is proof.", "Symphonic success for [PLAYER] during music!", "Rocking the scales like a pro: go [PLAYER]!", "[PLAYER] is practically a rockstar now.", "Total music immersion from [PLAYER] today.", "The audience (us) is amazed by [PLAYER]!", "Musical genius at work: that's [PLAYER].", "[PLAYER] just composed a masterpiece session.", "Tune in! [PLAYER] is crushing the music logs.", "Graceful and melodic effort from [PLAYER]!", "The next big headliner: go [PLAYER]!", "Music beast mode: [PLAYER] is in the zone.", "Strumming/Singing their way to the top: [PLAYER]!", "Perfect pitch and perfect effort for [PLAYER]!", "[PLAYER] just set the bar high in music.", "Music heart and soul: that's [PLAYER] today.", "A total virtuoso vibes from [PLAYER]!", "Encore! [PLAYER] just finished a great session.", "[PLAYER] is making beautiful music today.", "The spotlight is on [PLAYER]'s musical grind.", "Harmony and hard work: go [PLAYER]!", "[PLAYER] just mastered the rhythm of points.", "Music proficiency level: ELITE for [PLAYER].", "A melodic journey to the top by [PLAYER].", "Just call [PLAYER] the maestro of music.", "[PLAYER] is hitting every single note today.", "Musical discipline at its finest: [PLAYER]!", "The soundtrack of victory belongs to [PLAYER].", "[PLAYER] just played/sang like a legend.", "Musical brilliance reached max for [PLAYER].", "A legendary music grind from [PLAYER] today.", "[PLAYER] is turning practice into perfection!", "The stage is set for [PLAYER]'s musical future."
+            ],
+            run: [
+                "[PLAYER] was a blur on the track today!", "Legend says [PLAYER] is still running...", "Speed demon alert: [PLAYER] just finished a run.", "Ran their heart out today: that's [PLAYER]!", "The road couldn't keep up with [PLAYER].", "Sonic the Hedgehog or [PLAYER]? Hard to tell.", "Pavement pounding proficiency from [PLAYER]!", "[PLAYER] just left tracks in the dust!", "Breaking the sound barrier: go [PLAYER]!", "Run, [PLAYER], run! And they did!", "Marathon mindset from [PLAYER] today.", "Negative splits and positive vibes for [PLAYER]!", "The fastest feet in the family: [PLAYER]!", "Running beast mode: ACTIVATED for [PLAYER].", "Cardio king/queen [PLAYER] is on a roll.", "[PLAYER] just outran the winter wind!", "Trail-blazing speed from [PLAYER] today.", "Sneakers are smokin' after [PLAYER]'s run.", "Heart pumping, heartbeat jumping: go [PLAYER]!", "The finish line is [PLAYER]'s best friend.", "[PLAYER] just crushed those miles today!", "Speed, endurance, and heart for [PLAYER].", "A legendary running grind from [PLAYER]!", "Just call [PLAYER] the roadrunner today.", "Running through barriers: go [PLAYER]!", "Elite level running focus from [PLAYER].", "[PLAYER] is moving at the speed of light.", "Sweat, speed, and success for [PLAYER]!", "Distance is just a number for [PLAYER].", "Running excellence achieved by [PLAYER].", "The path to victory is paved by [PLAYER].", "Unstoppable running momentum from [PLAYER]!", "Just call [PLAYER] the cardio commander.", "[PLAYER] just left the competition behind.", "A masterclass in running by [PLAYER]!", "Every step was a statement from [PLAYER].", "Running heart and soul: that's [PLAYER].", "The road is [PLAYER]'s playground today.", "[PLAYER] just conquered the long run!", "Fast and focused: go [PLAYER] on that run!"
+            ],
+            soccer: [
+                "[PLAYER] just scored an absolute banger!", "Move over Messi, [PLAYER] is in the building.", "The grass is still shaking from [PLAYER]'s footwork.", "Golazo! [PLAYER] just finished a soccer session.", "Clean sheets and goals for [PLAYER] today.", "Soccer star [PLAYER] is controlling the pitch.", "[PLAYER] just sent the ball top bins!", "Nutmegging the day: go [PLAYER]!", "Midfield maestro [PLAYER] is owning the game.", "A clinical finish from [PLAYER] on the field.", "Soccer beast mode: [PLAYER] is on fire.", "Striker energy from [PLAYER] today!", "Unstoppable on the wing: that's [PLAYER].", "[PLAYER] just put on a soccer clinic.", "The goalie is afraid of [PLAYER] right now.", "Soccer skills on point for [PLAYER] today.", "Total pitch dominance from [PLAYER]!", "A legendary soccer grind from [PLAYER].", "Just call [PLAYER] the soccer closer.", "Soccer heart and soul: go [PLAYER]!", "[PLAYER] is playing total football today.", "Defense, midfield, attack – [PLAYER] does it all.", "Soccer excellence achieved by [PLAYER].", "[PLAYER] just hit the bicycle kick of hustle!", "Mastering the beautiful game: go [PLAYER].", "Soccer intensity maxed out by [PLAYER]!", "Just call [PLAYER] the pitch commander.", "The ball just listens to [PLAYER] today.", "A hat-trick of effort from [PLAYER]!", "Soccer discipline meets raw talent for [PLAYER].", "The net is still bulging from [PLAYER]'s shot.", "Soccer magic from the boots of [PLAYER]!", "Unmatched soccer focus from [PLAYER].", "[PLAYER] is the heart of the soccer team.", "Taking the soccer world by storm: [PLAYER]!", "Perfect crossing and peak scoring: [PLAYER]!", "Soccer practice was no match for [PLAYER].", "A gold-medal soccer effort from [PLAYER]!", "[PLAYER] just defined soccer proficiency.", "Striking gold on the soccer field: go [PLAYER]!"
+            ],
+            walk: [
+                "[PLAYER] is hitting those steps with style!", "A breath of fresh air and points for [PLAYER].", "Walking the walk: [PLAYER] is on a roll.", "Consistent effort! [PLAYER] just finished a walk.", "Step by step, [PLAYER] is climbing the charts.", "Fresh air and fast feet for [PLAYER]!", "Stroll? No, that was a power walk by [PLAYER]!", "[PLAYER] just conquered another trail today.", "Walking their way to a win: go [PLAYER]!", "Another 10,000 steps? [PLAYER] is a machine!", "Walking heart and soul: that's [PLAYER].", "A peaceful but powerful walk for [PLAYER].", "[PLAYER] just walked circles around the day.", "Consistent, steady, and winning: go [PLAYER]!", "Walking beast mode: [PLAYER] is on a stroll.", "The king/queen of the neighborhood: [PLAYER]!", "Walking excellence achieved by [PLAYER].", "Fresh legs and big points for [PLAYER]!", "Step-count conqueror [PLAYER] is moving.", "[PLAYER] just mastered the art of the walk.", "Sunrise or sunset, [PLAYER] is walking strong.", "Walking intensity maxed out by [PLAYER]!", "Just call [PLAYER] the walking commander.", "The sidewalk belongs to [PLAYER] today.", "Every step was a statement from [PLAYER].", "Walking discipline at its finest: [PLAYER]!", "[PLAYER] is finding their stride today.", "A total miles-and-smiles session for [PLAYER].", "Walking legend [PLAYER] is putting in work.", "Great job hitting the pavement, [PLAYER]!", "A legendary walking grind from [PLAYER].", "Walking through the spring: go [PLAYER]!", "Just call [PLAYER] the trail blazer today.", "[PLAYER] just walked their way to the top.", "Health and happiness one step at a time: [PLAYER].", "A masterclass in walking by [PLAYER]!", "Unmatched walking focus from [PLAYER].", "[PLAYER] is taking the scenic route to victory.", "Walking heart and hustle: that's [PLAYER].", "Just one more mile? [PLAYER] did two!"
+            ],
+            bike: [
+                "[PLAYER] just crushed those pedals!", "Wheels spinning and points flying for [PLAYER]!", "Cycling beast mode: ACTIVATED for [PLAYER].", "[PLAYER] is leaving the competition in the dust!", "Fresh air and fast wheels: that's [PLAYER]!", "The road just felt the power of [PLAYER]'s ride.", "Pedal to the medal: go [PLAYER]!", "[PLAYER] is channeling their inner Tour de France today.", "Bike ride complete — [PLAYER] is absolutely flying.", "Hills? [PLAYER] ate them for breakfast.", "Two wheels, zero chill: go [PLAYER]!", "[PLAYER] just put in a legendary cycling session.", "Speed and stamina on full display from [PLAYER]!", "The bike trail belongs to [PLAYER] today.", "Cycling excellence achieved by [PLAYER].", "Every pedal stroke was a point for [PLAYER].", "Just call [PLAYER] the cycling commander.", "A total road warrior session from [PLAYER]!", "Bike hustle reached max capacity today for [PLAYER]!", "[PLAYER] is gliding through the spring air on two wheels.", "[PLAYER] just outpaced the whole neighbourhood.", "Unstoppable cycling momentum from [PLAYER]!", "Wind in the face, points on the board: go [PLAYER]!", "[PLAYER] is the king/queen of the open road today.", "Spinning those wheels and stacking those points: [PLAYER]!", "A masterclass in cycling from [PLAYER]!", "Every revolution of the pedals counts for [PLAYER].", "Cycling legend [PLAYER] is putting in the work.", "The spring roads are [PLAYER]'s playground today.", "One more km? [PLAYER] did ten more!"
+            ],
+            physio: [
+                "[PLAYER] is rebuilding stronger than ever!", "Recovery king/queen: [PLAYER] crushed physio.", "Rehab and results for [PLAYER] today!", "Physio focus reached level 100 for [PLAYER].", "[PLAYER] is a titanium warrior in physio!", "Strengthening and lengthening: go [PLAYER]!", "[PLAYER] just mastered the physio grind.", "Consistent recovery effort from [PLAYER].", "Physio beast mode: [PLAYER] is healing fast.", "Aligning the body and the goals: [PLAYER]!", "Physio powerhouse [PLAYER] is on a roll.", "Great discipline in the physio session, [PLAYER]!", "Rebuilding the engine: go [PLAYER]!", "Physio excellence achieved by [PLAYER].", "[PLAYER] is the master of the stretch today.", "Unstoppable recovery momentum from [PLAYER].", "Physio heart and soul: that's [PLAYER].", "Taking care of the temple: go [PLAYER].", "Physio discipline at its finest today!", "[PLAYER] just nailed every single exercise.", "Better, faster, stronger: it's [PLAYER].", "Physio magic is happening for [PLAYER]!", "A legendary physio grind from [PLAYER].", "Just call [PLAYER] the rehab commander.", "Focusing on the future: go [PLAYER].", "Physio intensity maxed out by [PLAYER]!", "The path to peak performance: physio [PLAYER].", "[PLAYER] is winning the long game today.", "Every movement was a win for [PLAYER].", "Physio star [PLAYER] is on the move.", "Recovery is part of the hustle: go [PLAYER]!", "[PLAYER] just defined physio proficiency.", "Stretching for success: that's [PLAYER].", "Alignment and points for [PLAYER] today.", "Great form in physio class, [PLAYER]!", "Physio legend in the making: [PLAYER].", "Stronger every day: go [PLAYER]!", "Physio warrior [PLAYER] is rising up.", "Total body focus from [PLAYER] today.", "Physio victory is yours, [PLAYER]!"
+            ],
+            volleyball: [
+                "Monster block! [PLAYER] crushed volleyball.", "Spiking their way to the top: [PLAYER]!", "A sky-high set and a win for [PLAYER]!", "Volleyball beast mode: [PLAYER] is on fire.", "[PLAYER] just put on a volleyball clinic.", "Digging deep for the points: go [PLAYER]!", "Volleyball magic from the hands of [PLAYER].", "Court general [PLAYER] is ruling volleyball.", "Unstoppable at the net: that's [PLAYER].", "Service ace! [PLAYER] is winning volleyball.", "Volleyball excellence achieved by [PLAYER].", "A legendary volleyball grind from [PLAYER].", "Just call [PLAYER] the court commander.", "Bump, set, smash! Go [PLAYER]!", "Volleyball intensity maxed out by [PLAYER]!", "[PLAYER] is controlling the court today.", "A total defensive masterclass by [PLAYER].", "Volleyball heart and soul: go [PLAYER]!", "[PLAYER] just redefined the spike today.", "High-IQ volleyball plays from [PLAYER]!", "The net just felt the power of [PLAYER].", "Volleyball star [PLAYER] is on the move.", "Elite level volleyball focus from [PLAYER].", "[PLAYER] is practically flying on the court.", "No one can return [PLAYER]'s serve today!", "Volleyball magic in progress for [PLAYER].", "Perfect rotation and peak effort: [PLAYER]!", "Volleyball hustle reached max for [PLAYER].", "Diving for every ball: go [PLAYER]!", "Volleyball powerhouse [PLAYER] is on a roll.", "Just call [PLAYER] the volleyball sensei.", "A smooth finish at the net for [PLAYER].", "Volleyball discipline meets raw talent.", "The scoreboard is singing [PLAYER]'s name.", "Every point was earned in volleyball today!", "[PLAYER] just showed total court command.", "Volleyball brilliance from [PLAYER]!", "Striking gold on the volleyball court!", "Volleyball legend [PLAYER] is rising.", "One more spike? [PLAYER] did ten more!"
+            ],
+            skating: [
+                "Gliding like a pro: go [PLAYER]!", "Frozen grace and serious skill for [PLAYER].", "Skating circles around the day: it's [PLAYER]!", "[PLAYER] just nailed the edges in skating.", "Triple axel energy from [PLAYER] today!", "Skating beast mode: ACTIVATED for [PLAYER].", "Smooth as ice: [PLAYER] just finished a session.", "The rink belongs to [PLAYER] today.", "Skating heart and soul: go [PLAYER]!", "[PLAYER] just mastered the frozen mat.", "Speed and style on the ice: [PLAYER]!", "Skating excellence achieved by [PLAYER].", "A legendary skating grind from [PLAYER].", "Just call [PLAYER] the ice commander.", "Sharp blades and sharp focus: [PLAYER]!", "Skating championship through the winter: go [PLAYER].", "A total frozen-tundra win for [PLAYER]!", "[PLAYER] just defined skating proficiency.", "Ice magic from the skates of [PLAYER]!", "Skating powerhouse [PLAYER] is on a roll.", "Unstoppable momentum on the ice: [PLAYER]!", "[PLAYER] is practically a skating legend now.", "Perfect form on the ice for [PLAYER]!", "Skating hustle reached max capacity today.", "The ice is [PLAYER]'s playground today.", "[PLAYER] just out-glided the competition.", "High-IQ skating plays from [PLAYER].", "Just call [PLAYER] the ice king/queen.", "Skating discipline at its finest today!", "[PLAYER] is moving like a blur on the ice.", "Frozen victory for [PLAYER] today!", "Every turn was a statement from [PLAYER].", "Skating star [PLAYER] is on the move.", "Elite level skating focus from [PLAYER].", "[PLAYER] just left their mark on the ice.", "Skating magic in progress for [PLAYER].", "Perfect balance found by [PLAYER] on ice.", "A masterclass in skating by [PLAYER]!", "Skating through the day with ease!", "One more lap? [PLAYER] did five more!"
+            ],
+            skiing: [
+                "[PLAYER] is absolutely carving it up on the slopes!", "Fresh powder and big points for [PLAYER] today!", "Slaloming through the day like a pro: go [PLAYER]!", "[PLAYER] just sent it! Epic skiing session recorded.", "The mountain was no match for [PLAYER]'s speed!", "Apis-ski points? No, just hard work from [PLAYER]!", "[PLAYER] just delivered a legendary downhill run.", "Check out that form! [PLAYER] is a skiing natural.", "Mogul master [PLAYER] is owning the mountain.", "[PLAYER] is basically a professional skier now!", "Catching big air and big points: go [PLAYER]!", "The chairlift can't keep up with [PLAYER]'s pace.", "Skiing beast mode: [PLAYER] is on fire!", "Goggles on, points up – that's the [PLAYER] way.", "Elite level carving from [PLAYER] today!", "That skiing run was absolute poetry, [PLAYER]!", "Mastering the black diamonds: go [PLAYER]!", "Cold air, hot hustle from [PLAYER] on the skis.", "Skiing heart and soul: [PLAYER] left it on the snow.", "Just call [PLAYER] the mountain commander today.", "A total white-out victory for [PLAYER] on skis!", "[PLAYER] just defined skiing excellence today.", "Speed, grace, and snow: go [PLAYER]!", "The slopes are still shaking from [PLAYER]'s run.", "[PLAYER] just hit peak performance in skiing!", "Pizza or French Fries? [PLAYER] chose pure speed.", "A legendary skiing grind from [PLAYER] today.", "Shredding the gnar: [PLAYER] is a skiing legend.", "Unstoppable momentum on the downhill for [PLAYER]!", "Just call [PLAYER] the yeti of the ski slopes.", "Every turn was a statement from [PLAYER] today!", "Skiing discipline meets raw talent for [PLAYER].", "The lodge is buzzing about [PLAYER]'s skiing!", "Total mountain dominance from [PLAYER] today.", "A masterclass in skiing by [PLAYER]!", "Skiing through the winter like a champion: [PLAYER].", "Unmatched focus on the slopes from [PLAYER].", "The mountain is [PLAYER]'s playground today.", "[PLAYER] just conquered the summit of hustle!", "Fast and focused: go [PLAYER] on those skis!"
+            ],
+            schoolwork: [
+                "[PLAYER] just leveled up their brainpower!", "Einstein who? [PLAYER] is on a massive study streak.", "Knowledge is power, and [PLAYER] is supercharged today!", "The library is still buzzing from [PLAYER]'s focus.", "Straight A effort from [PLAYER] on that school work!", "A total intellectual knockout by [PLAYER] today.", "[PLAYER] just mastered the art of the grind... in books!", "Homework? Done. Points? Earned. Go [PLAYER]!", "Brain gains! [PLAYER] is crushing the curriculum.", "The pen is mightier than the sword, and [PLAYER] proved it.", "Academic excellence in progress for [PLAYER].", "[PLAYER] just unlocked a new level of wisdom.", "Focus, discipline, and points for [PLAYER] in school.", "That was a high-IQ session from [PLAYER] today.", "Mastering the subjects one page at a time: [PLAYER]!", "Future scholar [PLAYER] is putting in the work.", "The books are afraid of [PLAYER]'s speed-reading!", "Academic beast mode: ACTIVATED for [PLAYER].", "[PLAYER] just composed a masterpiece of effort.", "Brilliant focus from [PLAYER] during study time.", "Calculated success for [PLAYER] on that school work!", "The path to the top starts with the books for [PLAYER].", "[PLAYER] just showed total command over the homework.", "Every chapter counts, and [PLAYER] read them all.", "Smart moves and smart points for [PLAYER] today!", "[PLAYER] is basically a human calculator now.", "A symphony of learning and logic from [PLAYER].", "The desk is still smoking from [PLAYER]'s hustle!", "Record-breaking study energy from [PLAYER] today.", "Just call [PLAYER] the professor of points.", "School work was no match for [PLAYER]'s focus.", "Elite level academic grind from [PLAYER] today.", "[PLAYER] is building a legacy of knowledge.", "That study session was a total ten, [PLAYER]!", "Building empires of logic: that's [PLAYER]!", "Total brain dominance from [PLAYER] today.", "[PLAYER] just nailed the academic lead.", "Logical and legendary – [PLAYER] won at school work.", "The sharpest mind and the biggest hustle: [PLAYER]!", "School star [PLAYER] just left it all on the page."
+            ],
+            swimming: [
+                "[PLAYER] is a total shark in the pool today!", "Making waves and earning points! Go [PLAYER].", "[PLAYER] just broke the sound barrier... underwater!", "Check out those fins! [PLAYER] is a natural swimmer.", "Swimming beast mode: ACTIVATED for [PLAYER].", "The pool water is still boiling from [PLAYER]'s pace.", "Smooth as silk! [PLAYER] just crushed those laps.", "Total aquatic dominance from [PLAYER] today.", "Diving deep and winning big! That's [PLAYER].", "The dolphins are taking notes on [PLAYER]'s form!", "Water-powered hustle from [PLAYER] in the pool.", "A legendary swim grind from [PLAYER] today!", "Just call [PLAYER] the king/queen of the deep.", "Stroke by stroke, [PLAYER] is climbing the charts.", "Chlorine and commitment for [PLAYER] today!", "Swimming excellence achieved by [PLAYER].", "Heart pumping, water jumping: go [PLAYER]!", "The pool belongs to [PLAYER] right now.", "[PLAYER] just defined what it means to be a swimmer.", "Fastest feet in the water belong to [PLAYER].", "Olympic-level energy from [PLAYER] in the pool.", "[PLAYER] is practically a torpedo on those laps!", "A total splash-down victory for [PLAYER] today.", "Building endurance one flip-turn at a time: [PLAYER]!", "Unstoppable momentum in the water for [PLAYER].", "The lanes are wide open for [PLAYER]'s speed.", "[PLAYER] just conquered the summit of the pool!", "Fresh water and fast laps for [PLAYER] today.", "A masterclass in swimming by [PLAYER]!", "Every lap was a statement from [PLAYER] today.", "Swimming discipline meets raw talent: go [PLAYER]!", "The scoreboard is singing [PLAYER]'s name underwater.", "Just call [PLAYER] the aqua commander today.", "A frozen-winter swim for a red-hot [PLAYER]!", "Elite level pool focus from [PLAYER] today.", "[PLAYER] is moving like a shadow through the water.", "Harmony and high-speed swimming for [PLAYER].", "Unmatched focus on the strokes from [PLAYER].", "The pool is [PLAYER]'s playground today.", "[PLAYER] just swam their way to the top of the feed!"
+            ],
+            general: [
+                "Whoa! [PLAYER] just crushed that [ACTIVITY] session!", "[PLAYER] is on fire with [ACTIVITY] today!", "Consistency is key, and [PLAYER] just locked in [ACTIVITY].", "Points incoming! [PLAYER] did great at [ACTIVITY]!", "Another day, another victory for [PLAYER] in [ACTIVITY].", "There's no stopping [PLAYER] at [ACTIVITY] now.", "Hustle and heart from [PLAYER] during [ACTIVITY]!", "[PLAYER] is taking [ACTIVITY] to the next level.", "Great focus from [PLAYER] during [ACTIVITY] today.", "A perfect score of effort for [PLAYER] in [ACTIVITY]!"
+            ]
+        };
+
+        const SPOTLIGHT_PHRASES = {
+            basketball: ["shooting hoops all week", "dominating the paint", "running the court", "draining threes"],
+            cheer: ["bringing the spirit", "flying high in stunts", "hitting every motion", "cheering their heart out"],
+            gym: ["pumping iron", "crushing the weights", "building serious strength", "hitting new PRs"],
+            hockey: ["lighting the lamp", "owning the ice", "sniping top shelf", "forechecking like a pro"],
+            karate: ["mastering the dojo", "perfecting every kata", "kicking with power", "showing true discipline"],
+            music: ["hitting all the high notes", "mastering the scales", "rocking out", "composing a victory"],
+            run: ["pounding the pavement", "blazing the trails", "speeding through the miles", "outrunning the wind"],
+            soccer: ["finding the back of the net", "dazzling with footwork", "controlling the midfield", "scoring bangers"],
+            walk: ["racking up the steps", "power walking to victory", "crushing the step count", "marching forward"],
+            physio: ["focusing on recovery", "rebuilding strength", "staying disciplined", "healing up strong"],
+            volleyball: ["spiking down", "digging deep", "blocking everything", "serving aces"],
+            skating: ["gliding to glory", "carving up the ice", "spinning to the top", "mastering the edges"],
+            tumbling: ["flipping to the top", "sticking every landing", "defying gravity", "tumbling with power"],
+            skiing: ["shredding the gnar", "carving fresh powder", "owning the downhill", "flying down the slopes"],
+            school: ["mastering the books", "studying hard", "acing the subjects", "expanding the mind"],
+            swimming: ["making waves", "owning the lanes", "swimming fast", "gliding through the water"],
+            bike: ["crushing the pedals", "riding hard", "owning the open road", "spinning to victory"],
+            default: ["hustling hard", "staying active", "putting in the work", "chasing goals"]
+        };
+
+        const SPOTLIGHT_OUTROS = [
+            "Everyone on the podium showed incredible grit this week. Keep pushing! 🚀",
+            "A massive week of effort from everyone. Who will take the crown next? 👀",
+            "The leaderboard is heating up! Stay consistent and chase those goals! 🔥",
+            "Spring is in the air and so is the hustle. Amazing work! 🌸",
+            "Records were broken and sweat was poured. Bring on the next challenge! 💪",
+            "Consistency is the key to victory. Great job to all competitors! 🗝️",
+            "From the trails to the court, the hustle was real this week! 🌟",
+            "Another week down, another step closer to the ultimate prize! 🏆",
+            "The competition is fierce! Don't let up now! ⚔️",
+            "Rest up and get ready to crush it again next week! 💤"
+        ];
+
+        let RAW_DATA = [];
+        let PROCESSED = {};
+        let selectedDate = new Date();
+        let charts = { progress: null, pies: {}, detail: null };
+        let spotlightWeekIndex = 0; // 0 = latest week
+        let availableWeeks = [];
+
+        const simpleHash = (str) => {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            return Math.abs(hash);
+        };
+
+        // NEW: Helper to get the current date in EST (America/New_York)
+        // Returns string "YYYY-MM-DD"
+        const getESTDate = () => {
+            return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+        };
+
+        const fetchCSV = async () => {
+            try {
+                const response = await fetch(`${GOOGLE_SHEET_URL}&_=${Date.now()}`);
+                const csv = await response.text();
+                const lines = csv.split('\n').slice(1);
+                RAW_DATA = lines.map((line, index) => {
+                    const parts = line.split(',');
+                    const p = parts[0];
+                    const date = parts[1];
+                    const act = parts[2];
+                    const dur = parts[4];
+                    const pts = parts[5];
+                    if(!p || !date) return null;
+                    let fDate = date.trim();
+                    if(fDate.includes('/')) {
+                        const [m, d, y] = fDate.split('/');
+                        fDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+                    }
+                    // 'id' tracks row order so we can show 'latest in sheet' for same-day entries
+                    return { id: index, player: p.trim().toLowerCase(), date: fDate, activity: act ? act.trim() : "Activity", duration: parseInt(dur) || 0, points: parseInt(pts) || 0 };
+                }).filter(Boolean);
+                processData();
+                renderAll();
+                document.getElementById('loading-state').classList.add('hidden');
+                document.getElementById('main-content').classList.remove('hidden');
+            } catch (e) { console.error(e); }
+        };
+
+        const calculateStreaks = (playerKey) => {
+            const dates = [...new Set(RAW_DATA.filter(r => r.player === playerKey).map(r => r.date))].sort();
+            if (dates.length === 0) return 0;
+            let streak = 0;
+            
+            // Use EST date for "Today"
+            const todayStr = getESTDate();
+            
+            // We verify if "today" or "yesterday" exists in the log to keep the streak alive
+            // Construct yesterday string
+            const todayDateObj = new Date(todayStr + 'T12:00:00');
+            const yesterdayDateObj = new Date(todayDateObj);
+            yesterdayDateObj.setDate(yesterdayDateObj.getDate() - 1);
+            const yesterdayStr = yesterdayDateObj.toISOString().split('T')[0];
+
+            if (!dates.includes(todayStr) && !dates.includes(yesterdayStr)) return 0;
+            
+            let checkDate = dates.includes(todayStr) ? todayDateObj : yesterdayDateObj;
+            
+            for (let i = dates.length - 1; i >= 0; i--) {
+                const currentCheckStr = checkDate.toISOString().split('T')[0];
+                if (dates[i] === currentCheckStr) { 
+                    streak++; 
+                    checkDate.setDate(checkDate.getDate() - 1); 
+                } else {
+                    break;
+                }
+            }
+            return streak;
+        };
+
+        // New helper for Longest Streak Badge
+        const calculateLongestStreak = (playerKey) => {
+            const dates = [...new Set(RAW_DATA.filter(r => r.player === playerKey).map(r => r.date))].sort();
+            if (dates.length === 0) return 0;
+            let maxStreak = 0;
+            let currentStreak = 1;
+            for (let i = 1; i < dates.length; i++) {
+                const prev = new Date(dates[i-1]);
+                const curr = new Date(dates[i]);
+                const diffTime = Math.abs(curr - prev);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                if (diffDays === 1) {
+                    currentStreak++;
+                } else {
+                    maxStreak = Math.max(maxStreak, currentStreak);
+                    currentStreak = 1;
+                }
+            }
+            return Math.max(maxStreak, currentStreak);
+        };
+
+        // New helper for Stats Badges
+        const getStats = (playerKey) => {
+            const days150 = Object.values(PROCESSED.daily).filter(d => (d[playerKey] || 0) >= 150).length;
+            const weeks600 = Object.values(PROCESSED.weekly).filter(w => (w[playerKey] || 0) >= 600).length;
+            return { days150, weeks600 };
+        };
+
+        const processData = () => {
+            const daily = {}, weekly = {}, final = {};
+            RAW_DATA.forEach(row => {
+                const { player, date, points } = row;
+                if(!daily[date]) daily[date] = {};
+                daily[date][player] = (daily[date][player] || 0) + points;
+            });
+            Object.keys(daily).forEach(d => { Object.keys(daily[d]).forEach(p => { if(daily[d][p] > 150) daily[d][p] = 150; }); });
+            Object.keys(daily).forEach(d => {
+                const start = getWeekStart(d);
+                if(!weekly[start]) weekly[start] = {};
+                Object.keys(daily[d]).forEach(p => { weekly[start][p] = (weekly[start][p] || 0) + daily[d][p]; });
+            });
+            Object.keys(weekly).forEach(w => { Object.keys(weekly[w]).forEach(p => { if(weekly[w][p] > 600) weekly[w][p] = 600; }); });
+            Object.keys(PLAYER_CONFIG).forEach(p => final[p] = 0);
+            Object.keys(weekly).forEach(w => { Object.keys(weekly[w]).forEach(p => { if(final[p] !== undefined) final[p] += weekly[w][p]; }); });
+            PROCESSED = { daily, weekly, final };
+            const sortedDates = Object.keys(daily).sort();
+            if(sortedDates.length) selectedDate = new Date(sortedDates[sortedDates.length-1] + 'T12:00:00');
+            
+            // Populate available weeks for spotlight
+            availableWeeks = Object.keys(weekly).sort().reverse();
+        };
+
+        const getWeekStart = (dateStr) => {
+            const d = new Date(dateStr + 'T12:00:00');
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            return new Date(d.setDate(diff)).toISOString().split('T')[0];
+        };
+
+        const updateCountdown = () => {
+            // Updated to be Timezone aware (EDT -04:00) so it aligns with EST/EDT Reset
+            const target = new Date('2026-06-28T23:59:59-04:00').getTime();
+            const diff = target - new Date().getTime();
+            if (diff <= 0) { document.getElementById('countdown-timer').innerText = "Finished!"; return; }
+            const weeks = Math.floor(diff / (1000 * 60 * 60 * 24 * 7));
+            const days = Math.floor((diff % (1000 * 60 * 60 * 24 * 7)) / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const secs = Math.floor((diff % (1000 * 60)) / 1000);
+            document.getElementById('countdown-timer').innerText = `Time Remaining: ${weeks}w ${days}d ${hours}h ${mins}m ${secs}s`;
+        };
+
+        const getFunMessage = (player, activity, date, points) => {
+            const uniqueId = `${player}-${date}-${activity}-${points}`;
+            const hashValue = simpleHash(uniqueId);
+            
+            let category = 'general';
+            const actLower = activity.toLowerCase();
+            if (actLower.includes('gym')) category = 'gym';
+            else if (actLower.includes('run')) category = 'run';
+            else if (actLower.includes('ball') || actLower.includes('basket')) category = 'basketball';
+            else if (actLower.includes('karate')) category = 'karate';
+            else if (actLower.includes('cheer')) category = 'cheer';
+            else if (actLower.includes('tumble')) category = 'tumbling';
+            else if (actLower.includes('soccer')) category = 'soccer';
+            else if (actLower.includes('walk')) category = 'walk';
+            else if (actLower.includes('physio')) category = 'physio';
+            else if (actLower.includes('volleyball')) category = 'volleyball';
+            else if (actLower.includes('skating')) category = 'skating';
+            else if (actLower.includes('music')) category = 'music';
+            else if (actLower.includes('hockey')) category = 'hockey';
+            else if (actLower.includes('ski')) category = 'skiing';
+            else if (actLower.includes('school') || actLower.includes('homework') || actLower.includes('study')) category = 'schoolwork';
+            else if (actLower.includes('swim')) category = 'swimming';
+            
+            const msgs = HUSTLE_MESSAGES[category] || HUSTLE_MESSAGES.general;
+            const msgIndex = hashValue % msgs.length;
+            const msg = msgs[msgIndex];
+            return msg.replace('[PLAYER]', player).replace('[ACTIVITY]', activity);
+        };
+
+        const renderHustleFeed = () => {
+            const container = document.getElementById('hustle-feed');
+            // Sort by Date descending, then by ID descending (latest added to sheet first)
+            const sorted = [...RAW_DATA].sort((a,b) => b.date.localeCompare(a.date) || b.id - a.id).slice(0, 15);
+            container.innerHTML = '';
+            sorted.forEach(item => {
+                const p = PLAYER_CONFIG[item.player];
+                if (!p) return;
+                const activityIcon = getActivityIcon(item.activity);
+                const message = getFunMessage(p.name, item.activity, item.date, item.points);
+                container.innerHTML += `<div class="flex items-start gap-5 p-6 bg-slate-50 border border-slate-100 rounded-[1.5rem] shadow-sm">
+                    <span class="text-4xl">${activityIcon}</span>
+                    <div class="flex-1">
+                        <p class="text-base font-bold text-slate-800 leading-tight mb-2">${message}</p>
+                        <div class="flex justify-between items-center">
+                            <span class="text-[11px] text-slate-400 font-black uppercase tracking-widest">${new Date(item.date + 'T12:00:00').toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}</span>
+                            <span class="font-black text-blue-600 text-base tracking-tighter uppercase">+${item.points} PTS</span>
+                        </div>
+                    </div>
+                </div>`;
+            });
+        };
+
+        const renderAll = () => {
+            renderCards(); renderWeeklyProgress(); renderPies(); renderChart(); renderLog(); renderPrize(); renderSpotlight(); renderHustleFeed(); renderConsistencyLeaderboard();
+        };
+
+        const renderCards = () => {
+            const container = document.getElementById('player-cards-container');
+            container.innerHTML = '';
+            const leaderKey = Object.entries(PROCESSED.final).sort((a,b) => b[1] - a[1])[0][0];
+            
+            // EST Aware Date Calculation
+            const todayStr = getESTDate();
+            
+            const currentWeek = getWeekStart(todayStr);
+            // Prev week logic needs to respect the week start logic
+            const currentWeekDateObj = new Date(currentWeek + 'T12:00:00');
+            const prevWeekDateObj = new Date(currentWeekDateObj);
+            prevWeekDateObj.setDate(prevWeekDateObj.getDate() - 7);
+            const prevWeek = prevWeekDateObj.toISOString().split('T')[0];
+
+            // Calculate Day of week (1-7) for pace
+            const todayDateObj = new Date(todayStr + 'T12:00:00');
+            const dayIdx = todayDateObj.getDay(); // 0 Sun - 6 Sat
+            // If week starts Mon (which getWeekStart implies by aligning to Mon), 
+            // Mon=1, ... Sun=7
+            const dayOfWeek = dayIdx === 0 ? 7 : dayIdx;
+            
+            Object.entries(PLAYER_CONFIG).sort().forEach(([key, p]) => {
+                const score = PROCESSED.final[key] || 0;
+                const colors = TAILWIND_COLOR_MAP[p.color];
+                const streak = calculateStreaks(key);
+                const longestStreak = calculateLongestStreak(key);
+                const { days150, weeks600 } = getStats(key);
+                const currentWeekTotal = (PROCESSED.weekly[currentWeek] && PROCESSED.weekly[currentWeek][key]) || 0;
+                const pastWeekTotal = (PROCESSED.weekly[prevWeek] && PROCESSED.weekly[prevWeek][key]) || 0;
+                
+                const currentPace = currentWeekTotal / dayOfWeek;
+                const pastPace = pastWeekTotal / 7;
+                let trendIcon = currentPace > pastPace + 5 ? '↑' : (currentPace < pastPace - 5 ? '↓' : '');
+                
+                container.innerHTML += `
+                <div onclick="showDetail('${key}')" class="bg-white p-7 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-lg transition cursor-pointer group relative flex flex-col justify-between h-full min-h-[220px]">
+                    ${key === leaderKey ? '<div class="absolute -top-5 -left-3 text-5xl z-10">👑</div>' : ''}
+                    
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="flex gap-4">
+                            <div class="flex flex-col items-center gap-1 min-w-[3.5rem]">
+                                <span class="text-5xl group-hover:rotate-12 transition-transform">${p.emoji}</span>
+                                ${trendIcon ? `<span class="uppercase tracking-widest text-slate-400 text-[9px] font-black whitespace-nowrap" title="Weekly Pace vs Last Week">${trendIcon} PACE</span>` : ''}
+                            </div>
+                            
+                            <div class="flex flex-col justify-center">
+                                <h3 class="text-2xl font-bold text-slate-800 tracking-tight leading-none mb-2">${p.name}</h3>
+                                
+                                <div class="flex flex-wrap gap-1.5">
+                                    ${streak >= 1 ? `<span class="bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter border border-orange-100" title="Current Active Streak">🔥 ${streak} DAY</span>` : ''}
+                                    <span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter border border-slate-200" title="Longest Streak Achieved">🏆 Max: ${longestStreak}</span>
+                                    ${days150 > 0 ? `<span class="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter border border-blue-100" title="Days with 150 Points (Daily Cap)">💯 x${days150}</span>` : ''}
+                                    ${weeks600 > 0 ? `<span class="bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter border border-purple-100" title="Weeks with 600 Points (Weekly Cap)">🎓 x${weeks600}</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-right pl-2">
+                            <div class="text-3xl font-black ${colors.text}">${score}</div>
+                            <div class="text-[10px] uppercase tracking-widest text-slate-400 font-black">Total</div>
+                        </div>
+                    </div>
+
+                    <div class="w-full bg-slate-100 h-3.5 rounded-full overflow-hidden mt-4">
+                        <div class="${colors.bg} h-full progress-fill" style="width: ${Math.min((score / 7000) * 100, 100)}%"></div>
+                    </div>
+                </div>`;
+            });
+        };
+
+        const renderWeeklyProgress = () => {
+            const container = document.getElementById('weekly-progress-bars');
+            // Use EST date here too to show correct week progress based on EST time
+            const week = getWeekStart(getESTDate());
+            container.innerHTML = '';
+            Object.entries(PLAYER_CONFIG).sort().forEach(([key, p]) => {
+                const val = (PROCESSED.weekly[week] && PROCESSED.weekly[week][key]) || 0;
+                const colors = TAILWIND_COLOR_MAP[p.color];
+                container.innerHTML += `<div class="mb-4 last:mb-0"><div class="flex justify-between text-base font-black mb-3"><span class="text-slate-700 font-black">${p.emoji} ${p.name}</span><span class="${colors.text}">${val} / 600</span></div><div class="h-3 bg-slate-100 rounded-full overflow-hidden shadow-inner"><div class="${colors.bg} h-full transition-all duration-1000" style="width: ${(val / 600) * 100}%"></div></div></div>`;
+            });
+        };
+
+        const renderPies = () => {
+            const grid = document.getElementById('activity-pie-grid');
+            grid.innerHTML = '';
+            Object.values(charts.pies).forEach(c => c && c.destroy());
+            Object.entries(PLAYER_CONFIG).sort().forEach(([key, p]) => {
+                const logs = RAW_DATA.filter(r => r.player === key);
+                if(!logs.length) return;
+                const acts = {};
+                logs.forEach(l => { if(!acts[l.activity]) acts[l.activity] = { pts: 0, mins: 0 }; acts[l.activity].pts += l.points; acts[l.activity].mins += l.duration; });
+                const cell = document.createElement('div');
+                cell.className = "flex flex-col items-center justify-center p-3 rounded-[1.5rem] bg-slate-50 border border-slate-100 shadow-sm";
+                cell.innerHTML = `<div class="text-[10px] font-black text-slate-400 mb-1 tracking-widest uppercase">${p.name}</div><div class="chart-container" style="height:120px"><canvas id="pie-${key}"></canvas></div>`;
+                grid.appendChild(cell);
+                charts.pies[key] = new Chart(document.getElementById(`pie-${key}`).getContext('2d'), {
+                    type: 'doughnut',
+                    data: { labels: Object.keys(acts), datasets: [ { label: 'Points', data: Object.values(acts).map(a => a.pts), backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'], borderWidth: 0, cutout: '45%', spacing: 3 }, { label: 'Minutes', data: Object.values(acts).map(a => a.mins), backgroundColor: ['#3b82f699', '#10b98199', '#f59e0b99', '#ef444499', '#8b5cf699', '#ec489999'], borderWidth: 0, cutout: '30%', spacing: 3 } ] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: true } } }
+                });
+            });
+        };
+
+        const renderChart = () => {
+            if(charts.progress) charts.progress.destroy();
+            const ctx = document.getElementById('progress-chart').getContext('2d');
+            const dates = [];
+            let curr = new Date('2026-05-03T12:00:00');
+            const latestDataDateStr = [...new Set(RAW_DATA.map(r => r.date))].sort().pop();
+            const end = latestDataDateStr ? new Date(latestDataDateStr + 'T12:00:00') : new Date('2026-05-05T12:00:00');
+            while(curr <= end) { dates.push(curr.toISOString().split('T')[0]); curr.setDate(curr.getDate() + 1); }
+            const datasets = Object.entries(PLAYER_CONFIG).map(([key, p]) => {
+                let total = 0;
+                return {
+                    label: p.name,
+                    data: dates.map(d => {
+                        if (d === '2026-05-03') return 0; 
+                        total += (PROCESSED.daily[d] && PROCESSED.daily[d][key]) || 0; 
+                        return total; 
+                    }), 
+                    borderColor: p.hex, 
+                    backgroundColor: p.hex, 
+                    tension: 0.3, 
+                    pointRadius: 2, 
+                    borderWidth: 2
+                };
+            });
+            charts.progress = new Chart(ctx, {
+                type: 'line',
+                data: { labels: dates.map(d => d.split('-').slice(1).join('/')), datasets },
+                options: { 
+                    responsive: true, maintainAspectRatio: false, 
+                    scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { weight: 'bold' } } }, x: { grid: { display: false }, ticks: { font: { size: 12, weight: 'black' } } } },
+                    plugins: { legend: { display: true, position: 'bottom', labels: { padding: 40, usePointStyle: true, font: { size: 16, weight: 'bold' }, boxWidth: 10 } } } 
+                }
+            });
+        };
+
+        const renderLog = () => {
+            const dateStr = selectedDate.toISOString().split('T')[0];
+            document.getElementById('logbook-date').textContent = selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', weekday: 'short'});
+            const logs = RAW_DATA.filter(r => r.date === dateStr);
+            const container = document.getElementById('logbook-entries');
+            container.innerHTML = logs.length ? '' : '<div class="text-center py-24 text-slate-400 italic text-xl">No spring hustle found...</div>';
+            logs.sort((a,b) => b.points - a.points).forEach(l => {
+                const p = PLAYER_CONFIG[l.player];
+                if (!p) return;
+                const colors = TAILWIND_COLOR_MAP[p.color];
+                container.innerHTML += `<div class="flex items-center justify-between p-7 rounded-[2rem] ${colors.light} border ${colors.border} shadow-sm"><div class="flex items-center gap-6 text-base font-bold text-slate-800"><span class="text-5xl">${p.emoji}</span><div><div class="text-2xl font-black text-slate-800 tracking-tighter">${p.name}</div><div class="text-[11px] text-slate-500 font-black uppercase tracking-[0.1em] mt-1">${l.activity}</div></div></div><div class="text-right"><div class="text-3xl font-black ${colors.text} tracking-tighter">+${l.points} PTS</div><div class="text-xs font-black text-slate-400 uppercase tracking-widest mt-1">${l.duration} MINUTES</div></div></div>`;
+            });
+        };
+
+        const renderPrize = () => {
+            const container = document.getElementById('prize-tracker');
+            let html = `
+                <div class="grid grid-cols-[160px_1fr] items-center mb-6 text-[11px] font-black uppercase tracking-widest text-slate-400 px-2">
+                    <div>Player Rank</div>
+                    <div class="flex justify-between w-full">
+                        <span class="w-1/3 text-center">3k (Bronze)</span>
+                        <span class="w-1/3 text-center border-x border-slate-200">5k (Silver)</span>
+                        <span class="w-1/3 text-center text-yellow-600 font-bold">7k (Gold)</span>
+                    </div>
+                </div>
+                <div class="space-y-2">`;
+            Object.entries(PLAYER_CONFIG).sort().forEach(([key, p]) => {
+                const score = PROCESSED.final[key] || 0;
+                
+                // Calculate fill percentages for each segment
+                const s1 = Math.min(100, (score / 3000) * 100);
+                const s2 = score > 3000 ? Math.min(100, ((score - 3000) / 2000) * 100) : 0;
+                const s3 = score > 5000 ? Math.min(100, ((score - 5000) / 2000) * 100) : 0;
+
+                html += `
+                    <div class="flex flex-col gap-1.5 group p-2.5 bg-slate-50/50 rounded-2xl border border-transparent hover:border-slate-100 hover:bg-white transition-all shadow-sm">
+                        <div class="flex justify-between items-center text-sm font-black uppercase tracking-wider text-slate-700">
+                            <span class="flex items-center gap-3"><span class="text-2xl">${p.emoji}</span><span class="text-lg tracking-tight font-black">${p.name}</span></span>
+                            <span class="text-xl font-black text-blue-700 tracking-tighter">${score}</span>
+                        </div>
+                        <div class="h-4 w-full rounded-full flex gap-1 p-1">
+                            <div class="h-full flex-1 rounded-full bg-slate-200 overflow-hidden shadow-inner border border-slate-200">
+                                <div class="h-full bg-orange-500 transition-all duration-700 shadow-sm" style="width: ${s1}%"></div>
+                            </div>
+                            <div class="h-full flex-1 rounded-full bg-slate-200 overflow-hidden shadow-inner border border-slate-200">
+                                <div class="h-full bg-slate-500 transition-all duration-700 shadow-sm" style="width: ${s2}%"></div>
+                            </div>
+                            <div class="h-full flex-1 rounded-full bg-slate-200 overflow-hidden shadow-inner border border-slate-200">
+                                <div class="h-full bg-yellow-400 transition-all duration-700 shadow-sm" style="width: ${s3}%"></div>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        };
+
+        const renderConsistencyLeaderboard = () => {
+            const container = document.getElementById('consistency-list');
+            const compStart = new Date('2026-05-04T12:00:00');
+            const now = new Date();
+            const daysPassed = Math.max(1, Math.ceil((now - compStart) / (1000 * 60 * 60 * 24)));
+            const stats = Object.entries(PLAYER_CONFIG).map(([key, p]) => {
+                const logs = RAW_DATA.filter(r => r.player === key);
+                const activeDays = new Set(logs.map(l => l.date)).size;
+                return { key, p, activeDays, score: Math.round((activeDays / daysPassed) * 100) };
+            }).sort((a,b) => b.score - a.score);
+            container.innerHTML = stats.map((s, idx) => `
+                <div class="flex items-center justify-between p-4 rounded-[1.5rem] bg-slate-50 border border-slate-100 shadow-sm">
+                    <div class="flex items-center gap-4">
+                        <span class="text-base font-black text-slate-300 w-4 tracking-tighter">${idx + 1}</span>
+                        <span class="text-3xl group-hover:scale-110 transition-transform">${s.p.emoji}</span>
+                        <div>
+                            <div class="text-base font-black text-slate-800 tracking-tighter leading-none mb-1">${s.p.name}</div>
+                            <div class="text-[10px] text-slate-400 font-black uppercase tracking-widest">${s.activeDays} / ${daysPassed} Days</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-2xl font-black text-blue-600 tracking-tighter">${s.score}%</div>
+                        <div class="text-[9px] font-black uppercase text-slate-400">Match Rate</div>
+                    </div>
+                </div>`).join('');
+        };
+
+        // NEW: Helper to find top activity for a player in a week
+        const getTopActivityForWeek = (playerKey, weekStart) => {
+            const weekLogs = RAW_DATA.filter(r => r.player === playerKey && getWeekStart(r.date) === weekStart);
+            if (!weekLogs.length) return 'Activity';
+            const counts = {};
+            weekLogs.forEach(l => counts[l.activity] = (counts[l.activity] || 0) + l.points);
+            const top = Object.entries(counts).sort((a,b) => b[1] - a[1])[0];
+            return top ? top[0] : 'Activity';
+        };
+
+        // NEW: Helper to get a descriptive phrase for an activity based on week hash
+        const getActivityPhrase = (activity, seed) => {
+            let key = 'default';
+            const actLower = activity.toLowerCase();
+            
+            if (actLower.includes('basket') || actLower.includes('ball')) key = 'basketball';
+            else if (actLower.includes('cheer')) key = 'cheer';
+            else if (actLower.includes('gym')) key = 'gym';
+            else if (actLower.includes('hockey')) key = 'hockey';
+            else if (actLower.includes('karate')) key = 'karate';
+            else if (actLower.includes('music')) key = 'music';
+            else if (actLower.includes('run')) key = 'run';
+            else if (actLower.includes('soccer')) key = 'soccer';
+            else if (actLower.includes('walk')) key = 'walk';
+            else if (actLower.includes('physio')) key = 'physio';
+            else if (actLower.includes('volleyball')) key = 'volleyball';
+            else if (actLower.includes('skating') || actLower.includes('skate')) key = 'skating';
+            else if (actLower.includes('tumble') || actLower.includes('tumbling')) key = 'tumbling';
+            else if (actLower.includes('ski')) key = 'skiing';
+            else if (actLower.includes('school') || actLower.includes('homework') || actLower.includes('study')) key = 'school';
+            else if (actLower.includes('swim')) key = 'swimming';
+            else if (actLower.includes('bike') || actLower.includes('cycling') || actLower.includes('ride')) key = 'bike';
+
+            const phrases = SPOTLIGHT_PHRASES[key] || SPOTLIGHT_PHRASES['default'];
+            // Use the seed to pick a phrase deterministically for this week/activity combo
+            return phrases[seed % phrases.length];
+        };
+
+        // NEW: Generate a unique story for the week
+        const generateSpotlightStory = (weekKey, podium) => {
+            if (podium.length === 0) return `<p class="text-center text-slate-400 italic">No data recorded for this week.</p>`;
+
+            // Create a seed from the week string to ensure the story is consistent for that week
+            const seed = simpleHash(weekKey);
+            
+            const p1 = PLAYER_CONFIG[podium[0][0]];
+            const p2 = podium[1] ? PLAYER_CONFIG[podium[1][0]] : null;
+            const p3 = podium[2] ? PLAYER_CONFIG[podium[2][0]] : null;
+
+            const act1Name = getTopActivityForWeek(podium[0][0], weekKey);
+            const act1Phrase = getActivityPhrase(act1Name, seed);
+            
+            const act2Name = p2 ? getTopActivityForWeek(podium[1][0], weekKey) : '';
+            const act2Phrase = p2 ? getActivityPhrase(act2Name, seed + 1) : '';
+
+            const act3Name = p3 ? getTopActivityForWeek(podium[2][0], weekKey) : '';
+            const act3Phrase = p3 ? getActivityPhrase(act3Name, seed + 2) : '';
+
+            // 3 Different Templates based on seed
+            const templateId = seed % 3;
+
+            let story = "";
+
+            if (templateId === 0) {
+                story = `
+                    <span class="text-blue-600 font-black text-lg">${p1.name}</span> claimed the crown with a massive 
+                    <span class="font-black text-slate-800">${podium[0][1]}</span> points, spending the week 
+                    <span class="font-bold text-slate-600 bg-blue-50 px-1 rounded border border-blue-100">${act1Phrase}</span>! 
+                    ${p2 ? `Hot on their heels, <span class="text-slate-800 font-black">${p2.name}</span> took silver (${podium[1][1]} pts) by <span class="font-bold text-slate-500">${act2Phrase}</span>.` : ''} 
+                    ${p3 ? `Rounding out the podium, <span class="text-orange-600 font-black">${p3.name}</span> showed grit with ${podium[2][1]} points, mostly from <span class="font-bold text-slate-500">${act3Phrase}</span>.` : ''}
+                `;
+            } else if (templateId === 1) {
+                story = `
+                    It was all about <span class="font-bold text-slate-600 bg-blue-50 px-1 rounded border border-blue-100">${act1Phrase}</span> for 
+                    <span class="text-blue-600 font-black text-lg">${p1.name}</span>, who surged to 1st place with <span class="font-black text-slate-800">${podium[0][1]}</span> points!
+                    ${p2 ? `<span class="text-slate-800 font-black">${p2.name}</span> wasn't far behind, securing 2nd place with ${podium[1][1]} points after a week of <span class="font-bold text-slate-500">${act2Phrase}</span>.` : ''}
+                    ${p3 ? `Meanwhile, <span class="text-orange-600 font-black">${p3.name}</span> locked in 3rd place (${podium[2][1]} pts) by <span class="font-bold text-slate-500">${act3Phrase}</span>.` : ''}
+                `;
+            } else {
+                story = `
+                    An incredible performance by <span class="text-blue-600 font-black text-lg">${p1.name}</span>! They topped the charts with <span class="font-black text-slate-800">${podium[0][1]}</span> points, 
+                    <span class="font-bold text-slate-600 bg-blue-50 px-1 rounded border border-blue-100">${act1Phrase}</span> all week long.
+                    ${p2 ? `Silver went to <span class="text-slate-800 font-black">${p2.name}</span> (${podium[1][1]} pts), who was busy <span class="font-bold text-slate-500">${act2Phrase}</span>.` : ''}
+                    ${p3 ? `Finally, <span class="text-orange-600 font-black">${p3.name}</span> grabbed Bronze with ${podium[2][1]} points, proving their dedication by <span class="font-bold text-slate-500">${act3Phrase}</span>.` : ''}
+                `;
+            }
+
+            const outroIndex = seed % SPOTLIGHT_OUTROS.length;
+            const outro = SPOTLIGHT_OUTROS[outroIndex];
+
+            return `<p class="text-sm font-medium text-slate-600 leading-relaxed text-center px-4">${story} <br><span class="block mt-3 text-xs font-black text-slate-400 uppercase tracking-widest">${outro}</span></p>`;
+        };
+
+        const renderSpotlight = () => {
+            const container = document.getElementById('weekly-spotlight-container');
+            const weeks = Object.keys(PROCESSED.weekly).sort().reverse();
+            
+            // Safety check
+            if(weeks.length === 0) { 
+                container.innerHTML = '<div class="h-full flex items-center justify-center text-slate-400 italic text-xl">Spotlight waiting for data...</div>'; 
+                return; 
+            }
+
+            // Ensure index is within bounds
+            if(spotlightWeekIndex < 0) spotlightWeekIndex = 0;
+            if(spotlightWeekIndex >= weeks.length) spotlightWeekIndex = weeks.length - 1;
+
+            const targetWeek = weeks[spotlightWeekIndex];
+            const podium = Object.entries(PROCESSED.weekly[targetWeek]).sort((a,b) => b[1] - a[1]).slice(0, 3);
+            
+            // Format date range string for title
+            const startDate = new Date(targetWeek);
+            const endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + 6);
+            const dateRangeStr = `${startDate.toLocaleDateString('en-US', {month:'short', day:'numeric'})} - ${endDate.toLocaleDateString('en-US', {month:'short', day:'numeric'})}`;
+
+            const storyHtml = generateSpotlightStory(targetWeek, podium);
+
+            container.innerHTML = `
+                <div class="flex justify-between items-center mb-8">
+                    <button class="text-2xl text-slate-300 hover:text-blue-600 transition font-black" onclick="changeSpotlight(1)" ${spotlightWeekIndex >= weeks.length-1 ? 'disabled style="opacity:0"' : ''}>←</button>
+                    <div class="text-center">
+                        <h3 class="text-2xl font-bold text-slate-800 uppercase tracking-widest underline decoration-blue-100 underline-offset-8 font-extrabold tracking-tighter">Weekly Spotlight</h3>
+                        <span class="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-2 block">${dateRangeStr}</span>
+                    </div>
+                    <button class="text-2xl text-slate-300 hover:text-blue-600 transition font-black" onclick="changeSpotlight(-1)" ${spotlightWeekIndex <= 0 ? 'disabled style="opacity:0"' : ''}>→</button>
+                </div>
+                
+                <div class="flex items-end justify-center gap-6 h-64 mb-8">
+                    ${podium[1] ? `<div class="flex flex-col items-center w-24"><div class="bg-slate-200 w-full h-24 rounded-t-[2rem] flex items-center justify-center font-black text-slate-400 text-4xl shadow-sm">2</div><span class="text-sm font-black mt-3 text-slate-600 uppercase tracking-tighter">${PLAYER_CONFIG[podium[1][0]].name}</span><span class="text-xs font-bold text-slate-400">${podium[1][1]} pts</span></div>` : ''}
+                    ${podium[0] ? `<div class="flex flex-col items-center w-32"><span class="text-4xl mb-3">👑</span><div class="bg-yellow-400 w-full h-40 rounded-t-[2.5rem] flex items-center justify-center font-black text-white text-6xl shadow-xl border-x-4 border-t-4 border-yellow-300">1</div><span class="text-lg font-black mt-3 text-slate-800 uppercase tracking-tighter">${PLAYER_CONFIG[podium[0][0]].name}</span><span class="text-sm font-bold text-yellow-600">${podium[0][1]} pts</span></div>` : ''}
+                    ${podium[2] ? `<div class="flex flex-col items-center w-24"><div class="bg-orange-200 w-full h-16 rounded-t-[2rem] flex items-center justify-center font-black text-orange-400 text-3xl shadow-sm">3</div><span class="text-sm font-black mt-3 text-slate-600 uppercase tracking-tighter">${PLAYER_CONFIG[podium[2][0]].name}</span><span class="text-xs font-bold text-slate-400">${podium[2][1]} pts</span></div>` : ''}
+                </div>
+                
+                <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                    ${storyHtml}
+                </div>
+            `;
+        };
+
+        const changeSpotlight = (dir) => {
+            spotlightWeekIndex += dir;
+            renderSpotlight();
+        };
+
+        const showDetail = (key) => {
+            const p = PLAYER_CONFIG[key];
+            const colors = TAILWIND_COLOR_MAP[p.color];
+            const logs = RAW_DATA.filter(r => r.player === key);
+            const totalScore = PROCESSED.final[key];
+            const totalTime = logs.reduce((sum, log) => sum + log.duration, 0);
+            
+            // Time calculations
+            const compStart = new Date('2026-05-04T12:00:00');
+            const competitionEnd = new Date('2026-06-28T23:59:59');
+            const now = new Date();
+            
+            // Use the latest data date or today, whichever is relevant for "remaining" calc
+            const calcDate = now < compStart ? compStart : now; 
+            const daysPassed = Math.max(1, Math.ceil((calcDate - compStart) / (1000 * 60 * 60 * 24)));
+            const daysLeft = Math.max(0, Math.ceil((competitionEnd - calcDate) / (1000 * 60 * 60 * 24)));
+            const weeksLeft = Math.max(1, daysLeft / 7);
+
+            const activeDays = new Set(logs.map(l => l.date)).size;
+            const consistencyRating = Math.round((activeDays / daysPassed) * 100);
+            
+            // Current Week Logic
+            // Use EST date for "Today"
+            const todayStr = getESTDate();
+            const currentWeekStart = getWeekStart(todayStr);
+            const currentWeekScore = (PROCESSED.weekly[currentWeekStart] && PROCESSED.weekly[currentWeekStart][key]) || 0;
+            const dailyScoreToday = (PROCESSED.daily[todayStr] && PROCESSED.daily[todayStr][key]) || 0;
+            
+            // Re-calculate dates based on EST
+            const estNow = new Date(todayStr + "T12:00:00");
+            const dayOfWeek = estNow.getDay(); 
+            const normDay = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+            const daysRemInWeek = 7 - normDay; 
+            
+            const remainingWeekPts = 600 - currentWeekScore;
+            const remainingTodayCap = 150 - dailyScoreToday; 
+            const maxFutureDaysCap = (daysRemInWeek - 1) * 150; 
+            const totalWeeklyCapacity = remainingTodayCap + maxFutureDaysCap;
+
+            let capStatusMsg = "";
+            let capStatusColor = "text-slate-500 bg-slate-50 border-slate-100";
+            
+            if (remainingWeekPts <= 0) {
+                capStatusMsg = "WEEKLY CAP REACHED! 🎉";
+                capStatusColor = "text-emerald-600 bg-emerald-50 border-emerald-100";
+            } else if (remainingWeekPts > totalWeeklyCapacity) {
+                const maxPossible = currentWeekScore + totalWeeklyCapacity;
+                capStatusMsg = `Out of Reach: Max possible is ${maxPossible}`;
+                capStatusColor = "text-red-600 bg-red-50 border-red-100";
+            } else {
+                let neededPerDay = 0;
+                let daysToCount = daysRemInWeek;
+                if (remainingTodayCap === 0 && daysRemInWeek > 1) {
+                    daysToCount = daysRemInWeek - 1;
+                    neededPerDay = Math.ceil(remainingWeekPts / daysToCount);
+                    capStatusMsg = `Need <b>${neededPerDay}</b> pts/day (Done for today)`;
+                } else {
+                    neededPerDay = Math.ceil(remainingWeekPts / daysToCount);
+                    if(neededPerDay > 150) {
+                         capStatusMsg = `Warning: Need <b>${neededPerDay}</b> pts/day (Avg > 150)`;
+                         capStatusColor = "text-orange-600 bg-orange-50 border-orange-100";
+                    } else {
+                         capStatusMsg = `Need <b>${neededPerDay}</b> pts/day for ${daysToCount} days`;
+                         capStatusColor = "text-blue-600 bg-blue-50 border-blue-100";
+                    }
+                }
+            }
+
+            // Badges
+            const badges = [];
+            // ... (Badge Logic - same as previous step) ...
+            if (Object.values(PROCESSED.weekly).some(w => w[key] >= 600)) badges.push({ icon: '🎓', name: 'Cap Crusher', desc: 'Maxed out a week (600 pts)', count: Object.values(PROCESSED.weekly).filter(w => w[key] >= 600).length, label: 'Weeks' });
+            
+            const dailyMins = {};
+            logs.forEach(l => dailyMins[l.date] = (dailyMins[l.date] || 0) + l.duration);
+            if (Object.values(dailyMins).some(m => m >= 120)) badges.push({ icon: '👟', name: 'Marathoner', desc: 'Logged 120+ mins in one day', count: Object.values(dailyMins).filter(m => m >= 120).length, label: 'Days' });
+            
+            const uniqueActivities = new Set(logs.map(l => l.activity));
+            if (uniqueActivities.size >= 3) badges.push({ icon: '🏅', name: 'Multi-Sport', desc: 'Tried different activities', count: uniqueActivities.size, label: 'Sports' });
+            
+            if (Object.values(PROCESSED.daily).some(d => d[key] >= 100)) badges.push({ icon: '💯', name: 'Centurion', desc: 'Scored 100+ points in one day', count: Object.values(PROCESSED.daily).filter(d => (d[key] || 0) >= 100).length, label: 'Days' });
+            
+            const outdoorActivities = ['bike', 'cycling', 'swim', 'run', 'soccer', 'walk'];
+            const outdoorLogCount = logs.filter(l => outdoorActivities.some(a => l.activity.toLowerCase().includes(a))).length;
+            if (outdoorLogCount > 0) badges.push({ icon: '🌸', name: 'Spring Sprinter', desc: 'Logged an outdoor activity', count: outdoorLogCount, label: 'Times' });
+
+            const dailyActivityCounts = {};
+            logs.forEach(l => { if (!dailyActivityCounts[l.date]) dailyActivityCounts[l.date] = new Set(); dailyActivityCounts[l.date].add(l.activity); });
+            const doubleDipperCount = Object.values(dailyActivityCounts).filter(set => set.size >= 2).length;
+            if (doubleDipperCount > 0) badges.push({ icon: '✌️', name: 'Double Dipper', desc: 'Logged 2+ activities in one day', count: doubleDipperCount, label: 'Days' });
+            
+            const hatTrickCount = Object.values(dailyActivityCounts).filter(set => set.size >= 3).length;
+            if (hatTrickCount > 0) badges.push({ icon: '🎩', name: 'Hat Trick', desc: 'Logged 3+ activities in one day', count: hatTrickCount, label: 'Days' });
+
+            if (uniqueActivities.size >= 5) badges.push({ icon: '🤹', name: 'Jack of All Trades', desc: 'Logged 5+ different activities', count: uniqueActivities.size, label: 'Sports' });
+
+            const weeklyMins = {};
+            logs.forEach(l => { const w = getWeekStart(l.date); weeklyMins[w] = (weeklyMins[w] || 0) + l.duration; });
+            const the300Count = Object.values(weeklyMins).filter(m => m >= 300).length;
+            if (the300Count > 0) badges.push({ icon: '⚔️', name: 'The 300', desc: 'Logged 300+ minutes in a week', count: the300Count, label: 'Weeks' });
+
+            const activeDaysByWeek = {};
+            logs.forEach(l => { const w = getWeekStart(l.date); if (!activeDaysByWeek[w]) activeDaysByWeek[w] = new Set(); activeDaysByWeek[w].add(l.date); });
+            const perfectWeekCount = Object.values(activeDaysByWeek).filter(s => s.size === 7).length;
+            if (perfectWeekCount > 0) badges.push({ icon: '📅', name: 'Perfect Week', desc: 'Active every day (Mon-Sun)', count: perfectWeekCount, label: 'Weeks' });
+
+            let weekendWarriorCount = 0;
+            Object.keys(activeDaysByWeek).forEach(w => { const weekLogs = logs.filter(l => getWeekStart(l.date) === w); const sat = weekLogs.some(l => new Date(l.date).getDay() === 6); const sun = weekLogs.some(l => new Date(l.date).getDay() === 0); if(sat && sun) weekendWarriorCount++; });
+            if (weekendWarriorCount >= 1) badges.push({ icon: '🛡️', name: 'Weekend Warrior', desc: 'Active both Saturday and Sunday', count: weekendWarriorCount, label: 'Times' });
+
+            const heavyHitterCount = logs.filter(l => l.points >= 100).length;
+            if (heavyHitterCount > 0) badges.push({ icon: '🥊', name: 'Heavy Hitter', desc: 'Single session worth 100+ points', count: heavyHitterCount, label: 'Times' });
+
+            const daysOfWeekLogged = new Set();
+            logs.forEach(l => { daysOfWeekLogged.add(new Date(l.date + 'T12:00:00').getDay()); });
+            if (daysOfWeekLogged.size === 7) badges.push({ icon: '🌈', name: 'Calendar Conqueror', desc: 'Logged activity on every day of week', count: 1, label: 'Set' });
+
+            const activityFreq = {};
+            logs.forEach(l => { activityFreq[l.activity] = (activityFreq[l.activity] || 0) + 1; });
+            const specialistActivities = Object.entries(activityFreq).filter(([act, count]) => count >= 15);
+            if (specialistActivities.length > 0) { const topSpecialty = specialistActivities.sort((a,b) => b[1] - a[1])[0]; badges.push({ icon: '🎯', name: 'The Specialist', desc: `15+ sessions of ${topSpecialty[0]}`, count: topSpecialty[1], label: 'Sess.' }); }
+
+            const longestStreakDetail = calculateLongestStreak(key);
+            if (longestStreakDetail >= 10) badges.push({ icon: '🚀', name: 'Unstoppable', desc: 'Achieved a 10+ day streak', count: longestStreakDetail, label: 'Days' });
+
+            const weeklyActivityTotals = {}; 
+            RAW_DATA.forEach(row => { const w = getWeekStart(row.date); if (!weeklyActivityTotals[w]) weeklyActivityTotals[w] = {}; const actName = row.activity.trim(); if (!weeklyActivityTotals[w][actName]) weeklyActivityTotals[w][actName] = {}; weeklyActivityTotals[w][actName][row.player] = (weeklyActivityTotals[w][actName][row.player] || 0) + row.points; });
+            const myLeaderBadges = {}; 
+            Object.keys(weeklyActivityTotals).forEach(w => { Object.keys(weeklyActivityTotals[w]).forEach(act => { const playerScores = weeklyActivityTotals[w][act]; let maxPts = 0; Object.values(playerScores).forEach(pts => { if (pts > maxPts) maxPts = pts; }); if (maxPts > 0 && playerScores[key] === maxPts) { myLeaderBadges[act] = (myLeaderBadges[act] || 0) + 1; } }); });
+            Object.entries(myLeaderBadges).forEach(([act, count]) => { const prettyName = act.charAt(0).toUpperCase() + act.slice(1); badges.push({ icon: getActivityIcon(act), name: `${prettyName} Leader`, desc: `Top scorer in ${prettyName} for a week`, count: count, label: 'Weeks' }); });
+            
+            const scenariosHTML = [ 
+                { name: 'Bronze', pts: 3000, color: 'text-orange-600', bg: 'bg-orange-50' }, 
+                { name: 'Silver', pts: 5000, color: 'text-slate-500', bg: 'bg-slate-50' }, 
+                { name: 'Gold', pts: 7000, color: 'text-yellow-600', bg: 'bg-yellow-50' } 
+            ].map(t => {
+                const needed = Math.max(0, t.pts - totalScore);
+                if (needed === 0) return `<div class="p-6 rounded-[2rem] ${t.bg} border border-slate-100 opacity-60 flex flex-col justify-center h-full"><h4 class="font-black ${t.color} text-xl">${t.name}</h4><p class="text-xs font-black text-slate-400 uppercase">Goal Reached ✅</p></div>`;
+                const weeklyNeeded = Math.ceil(needed / weeksLeft);
+                const isImpossible = weeklyNeeded > 600;
+                return `
+                <div class="p-7 rounded-[2rem] ${t.bg} border border-slate-100 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-4">
+                            <h4 class="font-black ${t.color} text-2xl">${t.name}</h4>
+                            <span class="text-xs font-black px-3 py-1 bg-white rounded-full border border-slate-200 text-slate-500 shadow-sm">${needed.toLocaleString()} left</span>
+                        </div>
+                        ${isImpossible ? 
+                            `<div class="bg-red-100 text-red-600 p-3 rounded-xl text-xs font-black uppercase text-center border border-red-200 mb-2">Out of Reach <br><span class="text-[9px] opacity-75">Avg Req > 600/wk</span></div>` 
+                            : 
+                            `<div class="mb-4">
+                                <span class="text-3xl font-black text-slate-700 tracking-tighter block">${weeklyNeeded}</span>
+                                <span class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Avg Pts / Week</span>
+                            </div>`
+                        }
+                    </div>
+                    ${!isImpossible ? `<div class="pt-4 border-t border-slate-200/50">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Effort Equivalent</span>
+                        <div class="font-black text-slate-600 text-sm">
+                            ${Math.ceil((weeklyNeeded / p.multipliers.independent) / 10) * 10}m <span class="text-xs font-bold text-slate-400">Indep/Wk</span>
+                        </div>
+                    </div>` : ''}
+                </div>`;
+            }).join('');
+
+            const actStats = {};
+            logs.forEach(l => { if(!actStats[l.activity]) actStats[l.activity] = { pts: 0, time: 0, count: 0 }; actStats[l.activity].pts += l.points; actStats[l.activity].time += l.duration; actStats[l.activity].count++; });
+            
+            document.getElementById('overall-view').classList.add('hidden');
+            const detail = document.getElementById('detail-view');
+            detail.classList.remove('hidden');
+            
+            detail.innerHTML = `
+                <div class="max-w-6xl mx-auto p-4 md:p-8 space-y-10 animate-fade-in">
+                    <button onclick="hideDetail()" class="group flex items-center gap-3 text-slate-400 font-black hover:text-blue-600 transition text-lg tracking-wide uppercase mb-4"><span>←</span> Back to Hub</button>
+                    <div class="flex flex-col lg:flex-row gap-8 lg:items-stretch">
+                        <div class="flex-1 bg-white p-8 md:p-10 rounded-[3rem] border border-slate-100 shadow-sm flex flex-col md:flex-row items-center gap-8 md:gap-12 relative overflow-hidden">
+                            <span class="text-[8rem] md:text-[10rem] leading-none drop-shadow-sm">${p.emoji}</span>
+                            <div class="text-center md:text-left flex-1 z-10">
+                                <h2 class="text-5xl md:text-7xl font-black text-slate-800 mb-6 tracking-tighter leading-tight">${p.name}</h2>
+                                <div class="flex flex-wrap gap-4 justify-center md:justify-start">
+                                    <div class="px-6 py-4 bg-slate-50 rounded-2xl border border-slate-100 text-center">
+                                        <span class="text-[10px] font-black uppercase text-slate-400 block tracking-widest mb-1">Score</span>
+                                        <span class="text-4xl font-black ${colors.text} tracking-tighter">${totalScore.toLocaleString()}</span>
+                                    </div>
+                                    <div class="px-6 py-4 bg-slate-50 rounded-2xl border border-slate-100 text-center">
+                                        <span class="text-[10px] font-black uppercase text-slate-400 block tracking-widest mb-1">Effort</span>
+                                        <span class="text-4xl font-black text-slate-800 tracking-tighter">${Math.round(totalTime/60)}<small class="text-base text-slate-400 ml-1">HRS</small></span>
+                                    </div>
+                                    <div class="px-6 py-4 bg-blue-50 rounded-2xl border border-blue-100 text-center">
+                                        <span class="text-[10px] font-black uppercase text-blue-400 block tracking-widest mb-1">Pace</span>
+                                        <span class="text-4xl font-black text-blue-600 tracking-tighter">${consistencyRating}%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="lg:w-1/3 bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                            <div class="absolute top-0 right-0 w-32 h-32 bg-yellow-50 rounded-bl-[100%] -mr-10 -mt-10 z-0"></div>
+                            <div class="relative z-10">
+                                <h4 class="text-lg font-black text-slate-800 uppercase tracking-widest mb-4">This Week's Cap</h4>
+                                <div class="flex items-baseline gap-2 mb-2">
+                                    <span class="text-6xl font-black text-slate-800 tracking-tighter">${currentWeekScore}</span>
+                                    <span class="text-xl font-bold text-slate-400">/ 600</span>
+                                </div>
+                                <div class="w-full bg-slate-100 h-4 rounded-full overflow-hidden mb-4">
+                                    <div class="${colors.bg} h-full transition-all" style="width: ${(currentWeekScore/600)*100}%"></div>
+                                </div>
+                                <p class="text-sm font-bold ${capStatusColor} inline-block px-3 py-2 rounded-xl border">
+                                    ${capStatusMsg}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    ${badges.length > 0 ? `
+                    <div class="bg-white p-8 md:p-10 rounded-[3rem] border border-slate-100 shadow-sm">
+                        <h3 class="text-2xl font-black text-slate-800 mb-6 uppercase tracking-widest flex items-center gap-3">
+                            <span>🏅</span> Trophy Case
+                        </h3>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                            ${badges.map(b => `
+                                <div class="flex flex-col justify-between p-5 bg-slate-50 rounded-2xl border border-slate-100 hover:shadow-md transition-all h-full relative overflow-hidden group">
+                                    <div class="absolute top-0 right-0 bg-blue-100 text-blue-600 text-[10px] font-black px-2 py-1 rounded-bl-xl">${b.count} ${b.label}</div>
+                                    <div class="mb-3">
+                                        <span class="text-4xl">${b.icon}</span>
+                                    </div>
+                                    <div>
+                                        <div class="text-sm font-black text-slate-700 leading-tight mb-1">${b.name}</div>
+                                        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-snug">${b.desc}</div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>` : ''}
+                    <div class="bg-white p-8 md:p-12 rounded-[3rem] border border-slate-100 shadow-sm">
+                        <div class="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
+                            <div>
+                                <h3 class="text-3xl font-black text-slate-800 uppercase tracking-tight">🏆 Road to Glory</h3>
+                                <p class="text-sm text-slate-400 font-bold uppercase tracking-widest mt-2">Target Analysis • ${weeksLeft.toFixed(1)} Weeks Remaining</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            ${scenariosHTML}
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="bg-white p-8 md:p-12 rounded-[3rem] border border-slate-100 shadow-sm">
+                            <h3 class="text-xl font-black text-slate-800 mb-8 uppercase tracking-widest text-center underline decoration-blue-100 underline-offset-8">Activity Mix</h3>
+                            <div class="h-[400px]">
+                                <canvas id="detail-category-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="bg-white p-8 md:p-12 rounded-[3rem] border border-slate-100 shadow-sm">
+                            <h3 class="text-xl font-black text-slate-800 mb-8 uppercase tracking-widest text-center underline decoration-blue-100 underline-offset-8">Top Activities</h3>
+                            <div class="space-y-4 h-[400px] overflow-y-auto pr-2 hide-scrollbar">
+                                ${Object.entries(actStats).sort((a,b) => b[1].pts - a[1].pts).map(([name, s]) => `
+                                    <div class="flex items-center justify-between p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                                        <div class="flex items-center gap-4">
+                                            <span class="text-2xl">${getActivityIcon(name)}</span>
+                                            <div>
+                                                <div class="font-black text-slate-700 text-lg tracking-tight capitalize">${name}</div>
+                                                <div class="text-[10px] text-slate-400 font-black uppercase tracking-widest">${s.count} sessions</div>
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="font-black ${colors.text} text-2xl tracking-tighter">${s.pts}</div>
+                                            <div class="text-[10px] font-black text-slate-400 uppercase">Points</div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            
+            setTimeout(() => {
+                const ctx = document.getElementById('detail-category-chart').getContext('2d');
+                charts.detail = new Chart(ctx, { 
+                    type: 'bar', 
+                    data: { 
+                        labels: Object.keys(actStats).map(s => s.charAt(0).toUpperCase() + s.slice(1)), 
+                        datasets: [{ 
+                            data: Object.values(actStats).map(s => s.pts), 
+                            backgroundColor: p.hex, 
+                            borderRadius: 12,
+                            barThickness: 30
+                        }] 
+                    }, 
+                    options: { 
+                        indexAxis: 'y', 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        plugins: { legend: { display: false } }, 
+                        scales: { 
+                            x: { grid: { display: false }, ticks: { font: { weight: 'bold', size: 10 } } }, 
+                            y: { grid: { display: false }, ticks: { font: { size: 12, weight: 'bold' } } } 
+                        } 
+                    } 
+                });
+            }, 100);
+        };
+        
+        const hideDetail = () => { document.getElementById('overall-view').classList.remove('hidden'); document.getElementById('detail-view').classList.add('hidden'); };
+
+        const setupEvents = () => {
+            document.getElementById('rules-btn').onclick = () => document.getElementById('rules-modal').classList.add('flex');
+            document.querySelectorAll('.close-modal-btn').forEach(b => { b.onclick = () => { document.getElementById('rules-modal').classList.remove('flex'); document.getElementById('generic-modal').classList.remove('flex'); }; });
+            document.getElementById('prev-day-btn').onclick = () => { selectedDate.setDate(selectedDate.getDate()-1); renderLog(); };
+            document.getElementById('next-day-btn').onclick = () => { selectedDate.setDate(selectedDate.getDate()+1); renderLog(); };
+            document.getElementById('heatmap-btn').onclick = () => {
+                let h = '<h2 class="text-4xl font-black mb-12 text-center uppercase tracking-tighter text-blue-900 font-extrabold tracking-tighter">Season Activity Map</h2>';
+                Object.entries(PLAYER_CONFIG).forEach(([key, p]) => {
+                    h += `<div class="mb-10"><h4 class="text-xl font-black mb-4 text-slate-700">${p.emoji} ${p.name}</h4><div class="flex flex-wrap gap-2.5">`;
+                    let start = new Date('2026-05-04T12:00:00');
+                    for(let i=0; i<56; i++){
+                        const ds = start.toISOString().split('T')[0];
+                        const pts = (PROCESSED.daily[ds] && PROCESSED.daily[ds][key]) || 0;
+                        let lvl = pts > 140 ? 4 : (pts > 80 ? 3 : (pts > 40 ? 2 : (pts > 0 ? 1 : 0)));
+                        const colors = ['bg-slate-100','bg-blue-100','bg-blue-300','bg-blue-500','bg-blue-800'];
+                        h += `<div class="w-5 h-5 rounded-lg ${colors[lvl]} shadow-sm"></div>`;
+                        start.setDate(start.getDate()+1);
+                    }
+                    h += `</div></div>`;
+                });
+                openGeneric(h);
+            };
+        };
+
+        const openGeneric = (html) => { document.getElementById('generic-modal-body').innerHTML = html; document.getElementById('generic-modal').classList.add('flex'); };
+
+        window.onload = () => { fetchCSV(); setupEvents(); updateCountdown(); setInterval(updateCountdown, 1000); };
+    </script>
+</body>
+</html>
